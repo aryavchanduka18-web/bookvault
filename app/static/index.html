@@ -1,0 +1,1390 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self';
+               script-src 'self' https://cdnjs.cloudflare.com 'unsafe-inline';
+               style-src 'self' https://fonts.googleapis.com https://unpkg.com 'unsafe-inline';
+               font-src 'self' https://fonts.gstatic.com https://unpkg.com;
+               img-src 'self' data:;
+               connect-src 'self'">
+<title>BookVault</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
+
+<style>
+/* ===========================================================================
+   BookVault - design tokens
+   Enterprise data application. Conventions follow IBM Carbon (grey ramp,
+   single blue accent, 8px spacing grid, IBM Plex). Hand-built in plain CSS:
+   Carbon-influenced, NOT the official @carbon/styles package.
+   Light theme is locked deliberately. This is an internal tool and the brief
+   specifies a white background.
+   =========================================================================== */
+:root{
+  --bg:            #ffffff;
+  --surface:       #ffffff;
+  --surface-subtle:#f4f4f4;
+  --surface-sunken:#f8f8f8;
+
+  --border:        #e0e0e0;
+  --border-strong: #c6c6c6;
+
+  /* every text colour below passes WCAG AA on --surface */
+  --text:          #161616;  /* 16.9:1 */
+  --text-secondary:#525252;  /*  7.5:1 */
+  --text-tertiary: #6f6f6f;  /*  5.1:1 */
+
+  /* one locked accent, used identically on every surface */
+  --accent:        #0f62fe;  /* white text on this: 5.3:1 */
+  --accent-hover:  #0353e9;
+  --accent-wash:   #edf5ff;
+
+  /* sequential ramp from the same hue: no second accent is introduced */
+  --seq-1:#0f62fe; --seq-2:#4589ff; --seq-3:#78a9ff; --seq-4:#a6c8ff; --seq-5:#d0e2ff;
+
+  /* status colours: semantic state only, never decoration */
+  --success:#0e6027; --success-wash:#defbe6;
+  --warn:   #8e6a00; --warn-wash:   #fff8e1;
+  --danger: #a2191f; --danger-wash: #fff1f1;
+
+  /* spacing: 4px base on an 8px grid */
+  --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:24px; --s-6:32px; --s-7:48px;
+
+  /* shape: documented two-step scale, applied consistently */
+  --radius-sm:4px;   /* badges, inputs, buttons */
+  --radius-md:8px;   /* cards, panels */
+
+  --sans:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Consolas,monospace;
+
+  --shadow-sm:0 1px 2px rgba(22,22,22,.06);
+  --shadow-md:0 2px 8px rgba(22,22,22,.08);
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font-family:var(--sans); font-size:14px; line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3{margin:0; font-weight:600; letter-spacing:-0.01em}
+p{margin:0}
+code{font-family:var(--mono); font-size:12px}
+
+:where(a,button,input,select,summary,[tabindex]):focus-visible{
+  outline:2px solid var(--accent); outline-offset:2px; border-radius:var(--radius-sm);
+}
+
+.skip-link{
+  position:absolute; left:var(--s-4); top:-64px; z-index:100;
+  background:var(--accent); color:#fff; padding:var(--s-2) var(--s-4);
+  border-radius:var(--radius-sm); font-weight:500; text-decoration:none;
+  transition:top .12s ease;
+}
+.skip-link:focus{top:var(--s-4)}
+
+.sr-only{
+  position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+  overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0;
+}
+
+/* ---------------------------------------------------------------- header */
+.app-header{
+  position:sticky; top:0; z-index:40;
+  display:flex; align-items:center; gap:var(--s-6);
+  height:64px; padding:0 var(--s-5);
+  background:var(--surface); border-bottom:1px solid var(--border);
+}
+.brand{display:flex; align-items:center; gap:var(--s-2); font-weight:600; font-size:15px; white-space:nowrap}
+.brand .ph{font-size:20px; color:var(--accent)}
+.brand .sub{
+  font-weight:400; font-size:12px; color:var(--text-tertiary);
+  padding-left:var(--s-3); margin-left:var(--s-1); border-left:1px solid var(--border);
+}
+
+.tabs{display:flex; gap:var(--s-1); flex:1; min-width:0; overflow-x:auto; scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{
+  appearance:none; background:none; border:0; border-bottom:2px solid transparent;
+  color:var(--text-secondary); font:500 14px/1 var(--sans);
+  padding:var(--s-3); height:40px; cursor:pointer; white-space:nowrap;
+  transition:color .12s ease, border-color .12s ease;
+}
+.tab:hover{color:var(--text)}
+.tab[aria-selected="true"]{color:var(--text); border-bottom-color:var(--accent)}
+
+.header-right{display:flex; align-items:center; gap:var(--s-4); white-space:nowrap}
+
+.switch{
+  display:flex; align-items:center; gap:var(--s-2); cursor:pointer; user-select:none;
+  background:none; border:0; padding:var(--s-2); font:inherit;
+}
+.switch span.label{font-size:13px; color:var(--text-secondary)}
+.switch-track{
+  position:relative; width:36px; height:20px; flex:none;
+  background:var(--border-strong); border-radius:999px; transition:background .14s ease;
+}
+.switch-track::after{
+  content:""; position:absolute; top:2px; left:2px; width:16px; height:16px;
+  background:#fff; border-radius:50%; box-shadow:var(--shadow-sm);
+  transition:transform .14s ease;
+}
+.switch[aria-pressed="true"] .switch-track{background:var(--accent)}
+.switch[aria-pressed="true"] .switch-track::after{transform:translateX(16px)}
+.switch[aria-pressed="true"] span.label{color:var(--text)}
+
+.identity{display:flex; align-items:center; gap:var(--s-2); font-size:13px; color:var(--text-secondary)}
+.identity strong{color:var(--text); font-weight:500}
+
+/* ---------------------------------------------------------------- layout */
+main{max-width:1440px; margin:0 auto; padding:var(--s-5)}
+.page-head{margin-bottom:var(--s-5)}
+.page-head h1{font-size:20px}
+.page-head p{color:var(--text-secondary); margin-top:var(--s-1); max-width:72ch}
+
+.card{
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius-md); padding:var(--s-4);
+}
+.card-head{display:flex; align-items:baseline; justify-content:space-between; gap:var(--s-3); margin-bottom:var(--s-4)}
+.card-head h2{font-size:15px}
+.card-head .op{font-family:var(--mono); font-size:12px; color:var(--text-tertiary); white-space:nowrap}
+
+.grid{display:grid; gap:var(--s-4)}
+.grid-kpi{grid-template-columns:repeat(5,1fr); margin-bottom:var(--s-4)}
+.grid-2{grid-template-columns:repeat(2,1fr); margin-bottom:var(--s-4)}
+.grid-full{grid-template-columns:1fr; margin-bottom:var(--s-4)}
+
+/* ---------------------------------------------------------------- kpi */
+.kpi{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:var(--s-4)}
+.kpi dt{font-size:12px; color:var(--text-secondary); margin-bottom:var(--s-2)}
+.kpi dd{margin:0; font-family:var(--mono); font-size:28px; font-weight:500; letter-spacing:-0.02em; line-height:1.1}
+
+/* ---------------------------------------------------------------- controls */
+.btn{
+  appearance:none; display:inline-flex; align-items:center; justify-content:center; gap:var(--s-2);
+  height:40px; padding:0 var(--s-4); border-radius:var(--radius-sm);
+  font:500 14px/1 var(--sans); cursor:pointer; white-space:nowrap;
+  border:1px solid var(--border-strong); background:var(--surface); color:var(--text);
+  transition:background .12s ease, border-color .12s ease, transform .06s ease;
+}
+.btn:hover{background:var(--surface-subtle)}
+.btn:active{transform:translateY(1px)}
+.btn[disabled]{opacity:.45; cursor:not-allowed}
+.btn[disabled]:hover{background:var(--surface)}
+.btn-primary{background:var(--accent); border-color:var(--accent); color:#fff}
+.btn-primary:hover{background:var(--accent-hover); border-color:var(--accent-hover)}
+.btn-ghost{border-color:var(--border); color:var(--text-secondary)}
+.btn .ph{font-size:16px}
+.btn-sm{height:32px; padding:0 var(--s-3); font-size:13px}
+
+label.field{display:flex; flex-direction:column; gap:var(--s-2); font-size:12px; color:var(--text-secondary)}
+input[type="text"],input[type="search"],input[type="password"],select{
+  height:40px; padding:0 var(--s-3); font:400 14px/1 var(--sans);
+  color:var(--text); background:var(--surface);
+  border:1px solid var(--border-strong); border-radius:var(--radius-sm); width:100%;
+}
+input::placeholder{color:var(--text-tertiary)}
+input:focus,select:focus{outline:2px solid var(--accent); outline-offset:-1px; border-color:var(--accent)}
+.check{display:flex; align-items:center; gap:var(--s-2); font-size:13px; color:var(--text-secondary); height:40px}
+
+.filter-bar{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  gap:var(--s-3); align-items:end; margin-bottom:var(--s-4);
+}
+.filter-bar .actions{display:flex; gap:var(--s-2); align-items:center; flex-wrap:wrap}
+
+/* ---------------------------------------------------------------- table */
+.table-wrap{overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius-md)}
+table{width:100%; border-collapse:collapse; font-size:13px}
+caption{text-align:left; padding:var(--s-3) var(--s-4); color:var(--text-secondary); font-size:12px}
+th{
+  text-align:left; font-weight:500; font-size:12px; color:var(--text-secondary);
+  background:var(--surface-subtle); padding:var(--s-3) var(--s-4);
+  border-bottom:1px solid var(--border); white-space:nowrap;
+}
+td{padding:var(--s-3) var(--s-4); border-bottom:1px solid var(--border); vertical-align:middle}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover{background:var(--surface-sunken)}
+tr[data-id]{cursor:pointer}
+tr[data-id][aria-selected="true"]{background:var(--accent-wash)}
+.num{font-family:var(--mono); text-align:right; white-space:nowrap}
+.truncate{max-width:360px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.row-title{font-weight:500; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.row-sub{font-size:12px; color:var(--text-secondary); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+
+.badge{
+  display:inline-block; font-size:11px; font-weight:500; padding:2px var(--s-2);
+  border-radius:var(--radius-sm); white-space:nowrap;
+}
+.badge-neutral{background:var(--surface-subtle); color:var(--text-secondary)}
+.badge-ok{background:var(--success-wash); color:var(--success)}
+.badge-warn{background:var(--warn-wash); color:var(--warn)}
+.badge-danger{background:var(--danger-wash); color:var(--danger)}
+.badge-accent{background:var(--accent-wash); color:var(--accent)}
+
+.pager{display:flex; align-items:center; gap:var(--s-3); margin-top:var(--s-4); flex-wrap:wrap}
+.pager .status{font-size:13px; color:var(--text-secondary); font-variant-numeric:tabular-nums}
+
+/* ---------------------------------------------------------------- inspector */
+.inspector{margin-top:var(--s-4)}
+.inspector-head{
+  display:flex; align-items:center; gap:var(--s-2); margin-bottom:var(--s-3);
+  font-size:13px; color:var(--text-secondary);
+}
+.inspector-head .ph{color:var(--accent); font-size:16px}
+details.disclose{border:1px solid var(--border); border-radius:var(--radius-md); background:var(--surface)}
+details.disclose + details.disclose{margin-top:var(--s-3)}
+details.disclose > summary{
+  list-style:none; cursor:pointer; padding:var(--s-3) var(--s-4);
+  display:flex; align-items:center; gap:var(--s-2); font-weight:500; font-size:13px;
+}
+details.disclose > summary::-webkit-details-marker{display:none}
+details.disclose > summary .ph{color:var(--text-tertiary); transition:transform .12s ease}
+details.disclose[open] > summary .ph{transform:rotate(90deg)}
+details.disclose > summary .op{margin-left:auto; font-family:var(--mono); font-size:12px; color:var(--text-tertiary)}
+.disclose-body{padding:0 var(--s-4) var(--s-4)}
+
+pre{
+  margin:0; padding:var(--s-3); max-height:320px; overflow:auto;
+  background:var(--surface-sunken); border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  font-family:var(--mono); font-size:12px; line-height:1.6; color:var(--text);
+  tab-size:2;
+}
+.tok-key{color:#0043ce} .tok-str{color:#0e6027} .tok-num{color:#8a3800} .tok-lit{color:#6f6f6f}
+
+/* ---------------------------------------------------------------- chart */
+.chart-box{position:relative; height:240px}
+.chart-note{margin-top:var(--s-3); font-size:12px; color:var(--text-tertiary)}
+
+/* ---------------------------------------------------------------- feed */
+.feed{list-style:none; margin:0; padding:0; max-height:560px; overflow-y:auto}
+.feed li{display:flex; gap:var(--s-3); padding:var(--s-3) var(--s-4); border-bottom:1px solid var(--border)}
+.feed li:last-child{border-bottom:0}
+.feed .when{font-family:var(--mono); font-size:12px; color:var(--text-tertiary); white-space:nowrap; min-width:76px}
+.feed .what{font-weight:500}
+.feed .meta{font-family:var(--mono); font-size:12px; color:var(--text-secondary); margin-top:2px}
+
+/* status dot: real connection state only */
+.conn{display:inline-flex; align-items:center; gap:var(--s-2); font-size:13px; color:var(--text-secondary)}
+.conn .dot{width:8px; height:8px; border-radius:50%; background:var(--border-strong); flex:none}
+.conn[data-state="live"] .dot{background:var(--success)}
+.conn[data-state="retry"] .dot{background:var(--warn)}
+
+/* ---------------------------------------------------------------- states */
+.empty,.error-state{padding:var(--s-6) var(--s-4); text-align:center; color:var(--text-secondary)}
+.empty .ph,.error-state .ph{font-size:28px; color:var(--border-strong); display:block; margin-bottom:var(--s-3)}
+.error-state{color:var(--danger)}
+.error-state .ph{color:var(--danger)}
+
+/* ---------------------------------------------------------------- toast */
+#toasts{position:fixed; right:var(--s-5); bottom:var(--s-5); z-index:90;
+        display:flex; flex-direction:column; gap:var(--s-2); max-width:380px}
+.toast{
+  background:var(--surface); border:1px solid var(--border);
+  border-left:3px solid var(--success); border-radius:var(--radius-sm);
+  padding:var(--s-3) var(--s-4); box-shadow:var(--shadow-md); font-size:13px;
+}
+.toast[data-kind="error"]{border-left-color:var(--danger)}
+
+/* ---------------------------------------------------------------- motion */
+@media (prefers-reduced-motion:no-preference){
+  .feed li.fresh,.toast{animation:slide-in .18s cubic-bezier(.16,1,.3,1)}
+  @keyframes slide-in{from{opacity:0; transform:translateY(-4px)}}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none !important; transition:none !important}
+}
+
+/* ---------------------------------------------------------------- responsive */
+@media (max-width:1100px){ .grid-kpi{grid-template-columns:repeat(3,1fr)} }
+@media (max-width:860px){
+  .app-header{height:auto; flex-wrap:wrap; padding:var(--s-3) var(--s-4); gap:var(--s-3)}
+  .brand .sub{display:none}
+  .tabs{order:3; flex:1 0 100%; border-top:1px solid var(--border); padding-top:var(--s-1)}
+  .grid-kpi{grid-template-columns:repeat(2,1fr)}
+  .grid-2{grid-template-columns:1fr}
+  main{padding:var(--s-4)}
+  .truncate{max-width:200px}
+}
+@media (max-width:520px){
+  .grid-kpi{grid-template-columns:1fr}
+  .header-right{width:100%; justify-content:space-between}
+}
+</style>
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="app-header">
+  <div class="brand">
+    <i class="ph ph-books" aria-hidden="true"></i>
+    BookVault
+    <span class="sub">MongoDB Atlas</span>
+  </div>
+
+  <div class="tabs" role="tablist" aria-label="Sections">
+    <button class="tab" role="tab" id="tab-overview"    aria-controls="panel-overview"    aria-selected="true">Overview</button>
+    <button class="tab" role="tab" id="tab-catalog"     aria-controls="panel-catalog"     aria-selected="false" tabindex="-1">Catalog</button>
+    <button class="tab" role="tab" id="tab-circulation" aria-controls="panel-circulation" aria-selected="false" tabindex="-1">Circulation</button>
+    <button class="tab" role="tab" id="tab-activity"    aria-controls="panel-activity"    aria-selected="false" tabindex="-1">Activity</button>
+  </div>
+
+  <div class="header-right">
+    <button class="switch" id="devToggle" type="button" aria-pressed="false">
+      <span class="switch-track" aria-hidden="true"></span>
+      <span class="label">Developer view</span>
+    </button>
+    <div class="identity" id="identity"><span>Not signed in</span></div>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ====================================================== OVERVIEW -->
+<section class="panel" id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" tabindex="0">
+  <div class="page-head">
+    <h1>Library overview</h1>
+    <p>Holdings, circulation and reader activity across the whole collection.</p>
+  </div>
+
+  <dl class="grid grid-kpi" id="kpis"></dl>
+
+  <div class="grid grid-full">
+    <div class="card">
+      <div class="card-head">
+        <h2>Library insights</h2>
+        <span class="op dev-only" hidden>each row is one aggregation</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th scope="col">Insight</th>
+            <th scope="col">Result</th>
+            <th scope="col" class="num">Value</th>
+            <th scope="col" class="dev-only" hidden><span class="sr-only">Pipeline</span></th>
+          </tr></thead>
+          <tbody id="tblInsights"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-2">
+    <div class="card">
+      <div class="card-head"><h2>Titles by genre</h2><span class="op">$group · $sort</span></div>
+      <div class="chart-box"><canvas id="chartGenre" role="img" aria-label="Bar chart showing the number of titles in each genre"></canvas></div>
+      <p class="chart-note" id="noteGenre"></p>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Price distribution</h2><span class="op">$bucket</span></div>
+      <div class="chart-box"><canvas id="chartPrice" role="img" aria-label="Doughnut chart showing titles grouped into price bands"></canvas></div>
+      <p class="chart-note" id="notePrice"></p>
+    </div>
+  </div>
+
+  <div class="grid grid-full">
+    <div class="card">
+      <div class="card-head"><h2>Loans by month</h2><span class="op">$dateToString · $group</span></div>
+      <div class="chart-box"><canvas id="chartTime" role="img" aria-label="Line chart comparing titles issued and returned each month"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid grid-2">
+    <div class="card">
+      <div class="card-head"><h2>Most borrowed titles</h2><span class="op">$lookup · $unwind</span></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Title</th><th scope="col">Genre</th><th scope="col" class="num">Loans</th><th scope="col" class="num">Rating</th></tr></thead>
+          <tbody id="tblPopular"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Most active members</h2><span class="op">$lookup into users</span></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Member</th><th scope="col">Department</th><th scope="col" class="num">Loans</th></tr></thead>
+          <tbody id="tblMembers"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="inspector" id="inspOverview" hidden>
+    <div class="inspector-head"><i class="ph ph-code" aria-hidden="true"></i> Developer view</div>
+    <details class="disclose">
+      <summary><i class="ph ph-caret-right" aria-hidden="true"></i> Aggregation pipeline inspector<span class="op">11 pipelines</span></summary>
+      <div class="disclose-body">
+        <div class="filter-bar">
+          <label class="field">Pipeline<select id="pipePick"></select></label>
+          <div class="actions"><button class="btn" type="button" id="pipeRun"><i class="ph ph-play" aria-hidden="true"></i>Run</button></div>
+        </div>
+        <div class="grid grid-2" style="margin:0">
+          <div><p class="chart-note" style="margin:0 0 8px">Pipeline definition</p><pre id="pipeSrc">Select a pipeline and run it.</pre></div>
+          <div><p class="chart-note" style="margin:0 0 8px">Documents returned</p><pre id="pipeOut">&nbsp;</pre></div>
+        </div>
+      </div>
+    </details>
+  </div>
+</section>
+
+<!-- ====================================================== CATALOG -->
+<section class="panel" id="panel-catalog" role="tabpanel" aria-labelledby="tab-catalog" tabindex="0" hidden>
+  <div class="page-head">
+    <h1>Catalog</h1>
+    <p id="catalogLede">Search, filter and sort the collection by title, author, genre, publisher or availability.</p>
+  </div>
+
+  <div class="card">
+    <form class="filter-bar" id="filters" role="search">
+      <label class="field">Search<input type="search" id="fQuery" placeholder="title, author or tag"></label>
+      <label class="field">Genre<select id="fGenre"><option value="">All genres</option></select></label>
+      <label class="field">Tag<input type="text" id="fTag" placeholder="e.g. fiction"></label>
+      <label class="field">Publisher country<input type="text" id="fCountry" placeholder="e.g. UK"></label>
+      <label class="field">Sort
+        <select id="fSort">
+          <option value="added:desc">Recently added</option>
+          <option value="title:asc">Title, A to Z</option>
+          <option value="year:desc">Year, newest first</option>
+          <option value="price:desc">Price, highest first</option>
+          <option value="rating:desc">Rating, highest first</option>
+          <option value="popularity:desc">Most borrowed</option>
+        </select>
+      </label>
+      <div class="actions">
+        <label class="check"><input type="checkbox" id="fAvail"> In stock</label>
+        <button class="btn btn-primary" type="submit"><i class="ph ph-magnifying-glass" aria-hidden="true"></i>Apply</button>
+      </div>
+    </form>
+
+    <div class="table-wrap">
+      <table>
+        <caption id="catalogCaption">Loading catalog</caption>
+        <thead><tr>
+          <th scope="col">Title</th><th scope="col">Genre</th>
+          <th scope="col" class="num">Year</th><th scope="col" class="num">Price</th>
+          <th scope="col" class="num">Rating</th><th scope="col" class="num">Availability</th>
+        </tr></thead>
+        <tbody id="tblCatalog"></tbody>
+      </table>
+    </div>
+
+    <div class="pager">
+      <button class="btn btn-ghost" type="button" id="pagePrev"><i class="ph ph-caret-left" aria-hidden="true"></i>Previous</button>
+      <button class="btn btn-ghost" type="button" id="pageNext">Next<i class="ph ph-caret-right" aria-hidden="true"></i></button>
+      <span class="status" id="pageStatus" aria-live="polite"></span>
+    </div>
+  </div>
+
+  <div class="inspector" id="inspCatalog" hidden>
+    <div class="inspector-head"><i class="ph ph-code" aria-hidden="true"></i> Developer view</div>
+    <details class="disclose" open>
+      <summary><i class="ph ph-caret-right" aria-hidden="true"></i> Query plan<span class="op" id="planStage">explain()</span></summary>
+      <div class="disclose-body">
+        <p class="chart-note" style="margin:0 0 12px" id="queryTypeNote"></p>
+        <pre id="planOut">Apply a filter to see the execution plan.</pre>
+      </div>
+    </details>
+    <details class="disclose" id="pipelineDisclose" hidden>
+      <summary><i class="ph ph-caret-right" aria-hidden="true"></i> Aggregation pipeline for this result<span class="op" id="pipelineStages"></span></summary>
+      <div class="disclose-body">
+        <p class="chart-note" style="margin:0 0 12px">
+          Sorting by <strong>Most borrowed</strong> cannot be answered from one collection. The loan
+          count is derived by joining each matching book to its records in <code>borrow_records</code>
+          and counting them. Compare <code>loans_counted</code> in the result against the stored
+          <code>borrow_count</code>: they agree, which is what makes the cached value safe to use.
+        </p>
+        <pre id="pipelineOut"></pre>
+      </div>
+    </details>
+    <details class="disclose">
+      <summary><i class="ph ph-caret-right" aria-hidden="true"></i> Indexes<span class="op" id="indexCount"></span></summary>
+      <div class="disclose-body">
+        <p class="chart-note" style="margin:0 0 12px">
+          Read live from the server, so this is what MongoDB actually holds rather than what the
+          setup script intended to create. Every index here exists to serve a query this
+          application issues.
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th scope="col">Collection</th><th scope="col">Index</th>
+              <th scope="col">Keys</th><th scope="col">Type</th>
+            </tr></thead>
+            <tbody id="tblIndexes"></tbody>
+          </table>
+        </div>
+      </div>
+    </details>
+    <details class="disclose">
+      <summary><i class="ph ph-caret-right" aria-hidden="true"></i> Selected document<span class="op">raw BSON</span></summary>
+      <div class="disclose-body">
+        <p class="chart-note" style="margin:0 0 12px">
+          The document exactly as stored. Note <code>price</code> as Decimal128 rather than a float,
+          <code>publisher</code> and <code>copies</code> as embedded documents, <code>authors</code>
+          and <code>tags</code> as arrays, and the Computed Pattern fields
+          <code>avg_rating</code>, <code>borrow_count</code> and <code>review_count</code>.
+        </p>
+        <pre id="docOut">Select a row in the table above.</pre>
+      </div>
+    </details>
+  </div>
+</section>
+
+<!-- ====================================================== CIRCULATION -->
+<section class="panel" id="panel-circulation" role="tabpanel" aria-labelledby="tab-circulation" tabindex="0" hidden>
+  <div class="page-head">
+    <h1>Circulation</h1>
+    <p>Issuing a title writes a loan record and decrements stock inside a single transaction. Either both writes commit, or neither does.</p>
+  </div>
+
+  <div class="grid grid-2">
+    <div class="card">
+      <div class="card-head"><h2>Sign in</h2><span class="op">JWT · bcrypt</span></div>
+      <form class="filter-bar" id="loginForm">
+        <label class="field">Account<select id="loginUser"></select></label>
+        <label class="field">Password<input type="password" id="loginPass" value="bookvault123" autocomplete="current-password"></label>
+        <div class="actions"><button class="btn btn-primary" type="submit"><i class="ph ph-sign-in" aria-hidden="true"></i>Sign in</button></div>
+      </form>
+      <p class="chart-note">Every seeded account shares one demo password. The issued token carries the role used for authorisation.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Access control</h2><span class="op">role claim</span></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Endpoint</th><th scope="col">Minimum role</th></tr></thead>
+          <tbody>
+            <tr><td><code>GET /books</code>, <code>/analytics</code></td><td><span class="badge badge-neutral">Public</span></td></tr>
+            <tr><td><code>POST /borrow</code>, <code>/borrow/return</code></td><td><span class="badge badge-ok">Any member</span></td></tr>
+            <tr><td><code>POST /books</code></td><td><span class="badge badge-warn">Librarian</span></td></tr>
+            <tr><td><code>DELETE /users/&lt;id&gt;</code></td><td><span class="badge badge-danger">Administrator</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-full">
+    <div class="card">
+      <div class="card-head"><h2>Issue a title</h2><span class="op">multi-document transaction</span></div>
+      <form class="filter-bar" id="issueForm">
+        <label class="field">Find a title<input type="search" id="issueSearch" placeholder="search, then press Enter"></label>
+        <label class="field">Title<select id="issueBook"></select></label>
+        <div class="actions">
+          <button class="btn btn-primary" type="submit"><i class="ph ph-arrow-square-out" aria-hidden="true"></i>Issue</button>
+          <button class="btn" type="button" id="issueFail"><i class="ph ph-arrow-u-up-left" aria-hidden="true"></i>Rollback demonstration</button>
+        </div>
+      </form>
+      <p class="chart-note">The rollback demonstration aborts deliberately between the two writes. Choose a title with more than one copy free, otherwise the transaction stops earlier at the stock check.</p>
+    </div>
+  </div>
+
+  <div class="grid grid-full">
+    <div class="card">
+      <div class="card-head"><h2>Loans for this account</h2><span class="op">no $lookup required</span></div>
+      <div class="table-wrap">
+        <table>
+          <caption>Each loan stores a snapshot of the title, so this view needs only a single query.</caption>
+          <thead><tr><th scope="col">Title</th><th scope="col">Issued</th><th scope="col">Due</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Action</span></th></tr></thead>
+          <tbody id="tblLoans"><tr><td colspan="5" class="empty"><i class="ph ph-user-circle" aria-hidden="true"></i>Sign in to view loans.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="inspector" id="inspCirculation" hidden>
+    <div class="inspector-head"><i class="ph ph-code" aria-hidden="true"></i> Developer view</div>
+    <details class="disclose" open>
+      <summary><i class="ph ph-caret-right" aria-hidden="true"></i> Last transaction response<span class="op">JSON</span></summary>
+      <div class="disclose-body"><pre id="txOut">Issue or return a title to see the response.</pre></div>
+    </details>
+  </div>
+</section>
+
+<!-- ====================================================== ACTIVITY -->
+<section class="panel" id="panel-activity" role="tabpanel" aria-labelledby="tab-activity" tabindex="0" hidden>
+  <div class="page-head">
+    <h1>Activity</h1>
+    <p>A change stream reads the replica set oplog and pushes events over Server-Sent Events. This page never polls and never reloads.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>Live events</h2>
+      <span class="conn" id="conn" data-state="off"><span class="dot" aria-hidden="true"></span><span id="connText">Connecting</span></span>
+    </div>
+    <ul class="feed" id="feed" aria-live="polite" aria-relevant="additions">
+      <li><div class="empty" style="padding:24px 0;width:100%"><i class="ph ph-broadcast" aria-hidden="true"></i>No events yet. Issue a title on the Circulation tab and it will appear here within a second.</div></li>
+    </ul>
+  </div>
+
+  <div class="inspector" id="inspActivity" hidden>
+    <div class="inspector-head"><i class="ph ph-code" aria-hidden="true"></i> Developer view</div>
+    <details class="disclose" open>
+      <summary><i class="ph ph-caret-right" aria-hidden="true"></i> Change stream<span class="op" id="streamOp">db.watch()</span></summary>
+      <div class="disclose-body">
+        <p class="chart-note" style="margin:0 0 12px">
+          Change streams read the replica set's oplog, which is why they need a replica set and will
+          not run against a standalone server. The filter below is applied by MongoDB, so events the
+          application does not care about are never sent. <code>fullDocument: "updateLookup"</code>
+          attaches the post-update document, which an update event would otherwise omit.
+        </p>
+        <pre id="streamOut">Loading the watch configuration.</pre>
+      </div>
+    </details>
+  </div>
+</section>
+
+</main>
+
+<div id="toasts" aria-live="polite" aria-atomic="false"></div>
+
+<script>
+"use strict";
+
+/* ============================================================ state */
+let TOKEN = null, ME = null, DEV = false;
+let page = 0, lastFilter = "";
+const LIMIT = 15;
+const $ = (s) => document.querySelector(s);
+const NUM = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
+
+/* ============================================================ utilities */
+function toast(message, kind){
+  const el = document.createElement("div");
+  el.className = "toast";
+  if (kind) el.dataset.kind = kind;
+  el.textContent = message;                 // textContent, never innerHTML
+  $("#toasts").appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+async function api(path, options){
+  options = options || {};
+  const headers = Object.assign({}, options.headers);
+  if (options.body) headers["Content-Type"] = "application/json";
+  if (TOKEN) headers["Authorization"] = "Bearer " + TOKEN;
+
+  const response = await fetch(path, Object.assign({}, options, { headers: headers }));
+  const text = await response.text();
+  let data;
+  try { data = JSON.parse(text); } catch (err) { data = text; }
+
+  if (!response.ok){
+    const error = new Error((data && data.error) || response.statusText);
+    error.data = data;
+    error.status = response.status;
+    throw error;
+  }
+  return data;
+}
+
+/* JSON is rendered from DOM nodes only. Nothing from the database is ever
+   assigned to innerHTML, so a book title containing markup cannot execute. */
+function renderJson(target, value){
+  target.textContent = "";
+  const json = JSON.stringify(value, null, 2);
+  if (json === undefined){ target.textContent = "No data."; return; }
+
+  const pattern = /("(?:\\.|[^"\\])*")(\s*:)?|\b(true|false|null)\b|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g;
+  let cursor = 0, match;
+
+  while ((match = pattern.exec(json)) !== null){
+    if (match.index > cursor){
+      target.appendChild(document.createTextNode(json.slice(cursor, match.index)));
+    }
+    const span = document.createElement("span");
+    if (match[1] && match[2]){
+      span.className = "tok-key"; span.textContent = match[1];
+      target.appendChild(span);
+      target.appendChild(document.createTextNode(match[2]));
+    } else if (match[1]){
+      span.className = "tok-str"; span.textContent = match[1]; target.appendChild(span);
+    } else if (match[3]){
+      span.className = "tok-lit"; span.textContent = match[3]; target.appendChild(span);
+    } else {
+      span.className = "tok-num"; span.textContent = match[4]; target.appendChild(span);
+    }
+    cursor = pattern.lastIndex;
+  }
+  target.appendChild(document.createTextNode(json.slice(cursor)));
+}
+
+function cell(row, text, className){
+  const td = document.createElement("td");
+  td.textContent = (text === null || text === undefined || text === "") ? "\u2013" : String(text);
+  if (className) td.className = className;
+  row.appendChild(td);
+  return td;
+}
+
+function stateRow(tbody, columns, iconClass, message, isError){
+  tbody.textContent = "";
+  const tr = document.createElement("tr");
+  const td = document.createElement("td");
+  td.colSpan = columns;
+  td.className = isError ? "error-state" : "empty";
+  const icon = document.createElement("i");
+  icon.className = "ph " + iconClass;
+  icon.setAttribute("aria-hidden", "true");
+  td.appendChild(icon);
+  td.appendChild(document.createTextNode(message));
+  tr.appendChild(td);
+  tbody.appendChild(tr);
+}
+
+/* ============================================================ tabs */
+const tabs = Array.prototype.slice.call(document.querySelectorAll('[role="tab"]'));
+
+function selectTab(tab){
+  tabs.forEach((t) => {
+    const selected = t === tab;
+    t.setAttribute("aria-selected", String(selected));
+    t.tabIndex = selected ? 0 : -1;
+    document.getElementById(t.getAttribute("aria-controls")).hidden = !selected;
+  });
+  if (tab.id === "tab-activity") connectStream();
+}
+
+tabs.forEach((tab) => {
+  tab.addEventListener("click", () => selectTab(tab));
+  tab.addEventListener("keydown", (event) => {
+    const index = tabs.indexOf(tab);
+    let next = null;
+    if (event.key === "ArrowRight") next = tabs[(index + 1) % tabs.length];
+    if (event.key === "ArrowLeft")  next = tabs[(index - 1 + tabs.length) % tabs.length];
+    if (event.key === "Home")       next = tabs[0];
+    if (event.key === "End")        next = tabs[tabs.length - 1];
+    if (next){ event.preventDefault(); next.focus(); selectTab(next); }
+  });
+});
+
+/* ============================================================ developer view */
+const INSPECTORS = ["#inspOverview", "#inspCatalog", "#inspCirculation", "#inspActivity"];
+
+$("#devToggle").addEventListener("click", () => {
+  DEV = !DEV;
+  $("#devToggle").setAttribute("aria-pressed", String(DEV));
+  INSPECTORS.forEach((selector) => { $(selector).hidden = !DEV; });
+  document.querySelectorAll(".dev-only").forEach((node) => { node.hidden = !DEV; });
+  toast(DEV
+    ? "Developer view on. Pipelines, query plans and raw documents are now visible."
+    : "Developer view off.");
+});
+
+/* Jump from an insight row straight to the pipeline that produced it. */
+function openPipeline(name){
+  if (!DEV){
+    toast("Turn on Developer view to inspect the pipeline.");
+    return;
+  }
+  const select = $("#pipePick");
+  select.value = name;
+  const panel = $("#inspOverview").querySelector("details");
+  panel.open = true;
+  $("#pipeRun").click();
+  panel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+/* ============================================================ charts */
+let chartGenre = null, chartPrice = null, chartTime = null;
+
+const GRID_LINE = "#e0e0e0", TICK = "#525252";
+const RAMP = ["#0f62fe", "#4589ff", "#78a9ff", "#a6c8ff", "#d0e2ff"];
+
+const axisOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { display: false } },
+  scales: {
+    x: { ticks: { color: TICK, font: { size: 11, family: "IBM Plex Sans" } }, grid: { display: false } },
+    y: { ticks: { color: TICK, font: { size: 11, family: "IBM Plex Mono" } }, grid: { color: GRID_LINE }, border: { display: false } }
+  }
+};
+
+async function loadOverview(){
+  let data;
+  try { data = await api("/analytics/dashboard"); }
+  catch (err){ toast("Could not load the overview: " + err.message, "error"); return; }
+
+  const totals = data.totals || {};
+  const list = $("#kpis");
+  list.textContent = "";
+  [
+    ["Titles",           NUM.format(totals.titles || 0)],
+    ["Copies held",      NUM.format(totals.copies_total || 0)],
+    ["On loan",          NUM.format(totals.copies_on_loan || 0)],
+    ["Available",        NUM.format(totals.copies_available || 0)],
+    ["Collection value", "\u20B9" + NUM.format(totals.inventory_value || 0)]
+  ].forEach((pair) => {
+    const wrap = document.createElement("div");
+    wrap.className = "kpi";
+    const dt = document.createElement("dt"); dt.textContent = pair[0];
+    const dd = document.createElement("dd"); dd.textContent = pair[1];
+    wrap.appendChild(dt); wrap.appendChild(dd);
+    list.appendChild(wrap);
+  });
+
+  if (chartGenre) chartGenre.destroy();
+  chartGenre = new Chart($("#chartGenre"), {
+    type: "bar",
+    data: {
+      labels: data.by_genre.map((g) => g.genre),
+      datasets: [{ data: data.by_genre.map((g) => g.books), backgroundColor: RAMP[0], borderRadius: 2, maxBarThickness: 44 }]
+    },
+    options: axisOptions
+  });
+  $("#noteGenre").textContent = data.by_genre.length + " genres across the collection.";
+
+  if (chartPrice) chartPrice.destroy();
+  chartPrice = new Chart($("#chartPrice"), {
+    type: "doughnut",
+    data: {
+      labels: data.price_distribution.map((b) => "\u20B9" + NUM.format(b.from_price) + " and above"),
+      datasets: [{ data: data.price_distribution.map((b) => b.count), backgroundColor: RAMP, borderWidth: 2, borderColor: "#ffffff" }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: "58%",
+      plugins: { legend: { position: "right", labels: { color: TICK, boxWidth: 10, boxHeight: 10, font: { size: 11, family: "IBM Plex Sans" } } } }
+    }
+  });
+  $("#notePrice").textContent = "Band boundaries are defined in the $bucket stage, not in the browser.";
+
+  if (chartTime) chartTime.destroy();
+  chartTime = new Chart($("#chartTime"), {
+    type: "line",
+    data: {
+      labels: data.borrows_over_time.map((m) => m.month),
+      datasets: [
+        { label: "Issued",   data: data.borrows_over_time.map((m) => m.borrows), borderColor: RAMP[0], backgroundColor: "rgba(15,98,254,.08)", fill: true, tension: .25, pointRadius: 2 },
+        { label: "Returned", data: data.borrows_over_time.map((m) => m.returns), borderColor: "#8d8d8d", borderDash: [4, 4], fill: false, tension: .25, pointRadius: 2 }
+      ]
+    },
+    options: Object.assign({}, axisOptions, {
+      plugins: { legend: { display: true, position: "top", align: "end", labels: { color: TICK, boxWidth: 10, boxHeight: 10, font: { size: 11, family: "IBM Plex Sans" } } } }
+    })
+  });
+
+  const popular = $("#tblPopular");
+  popular.textContent = "";
+  data.most_borrowed.forEach((book) => {
+    const tr = document.createElement("tr");
+    cell(tr, book.title, "truncate");
+    cell(tr, book.genre);
+    cell(tr, book.times_borrowed, "num");
+    cell(tr, book.avg_rating, "num");
+    popular.appendChild(tr);
+  });
+
+  const members = $("#tblMembers");
+  members.textContent = "";
+  data.top_users.forEach((user) => {
+    const tr = document.createElement("tr");
+    cell(tr, user.name);
+    cell(tr, user.department);
+    cell(tr, user.books_borrowed, "num");
+    members.appendChild(tr);
+  });
+
+  loadInsights(data);
+}
+
+/* Headline answers, each one the first row of a real aggregation. */
+async function loadInsights(dashboard){
+  const body = $("#tblInsights");
+  body.textContent = "";
+
+  const rows = [];
+
+  const topBook = (dashboard.most_borrowed || [])[0];
+  if (topBook) rows.push(["Most borrowed title", topBook.title, topBook.times_borrowed + " loans", "most_borrowed"]);
+
+  try {
+    const rated = await api("/analytics/highest_rated");
+    const best = (rated.result || [])[0];
+    if (best) rows.push(["Highest rated title", best.title, best.average_rating + " from " + best.ratings_counted + " ratings", "highest_rated"]);
+  } catch (err){ /* insight omitted */ }
+
+  const topGenre = (dashboard.by_genre || [])[0];
+  if (topGenre) rows.push(["Largest genre", topGenre.genre, NUM.format(topGenre.copies) + " copies", "by_genre"]);
+
+  const topMember = (dashboard.top_users || [])[0];
+  if (topMember) rows.push(["Most active member", topMember.name + ", " + topMember.department, topMember.books_borrowed + " loans", "top_users"]);
+
+  const busiest = (dashboard.borrows_over_time || []).slice().sort((a, b) => b.borrows - a.borrows)[0];
+  if (busiest) rows.push(["Busiest month", busiest.month, busiest.borrows + " loans", "borrows_over_time"]);
+
+  if (!rows.length){ stateRow(body, 4, "ph-chart-line", "No insights available yet."); return; }
+
+  rows.forEach(([label, result, value, pipeline]) => {
+    const tr = document.createElement("tr");
+    cell(tr, label);
+    cell(tr, result, "truncate");
+    cell(tr, value, "num");
+
+    const action = document.createElement("td");
+    action.className = "dev-only";
+    action.hidden = !DEV;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "btn btn-ghost btn-sm";
+    button.textContent = "View pipeline";
+    button.addEventListener("click", () => openPipeline(pipeline));
+    action.appendChild(button);
+    tr.appendChild(action);
+
+    body.appendChild(tr);
+  });
+}
+
+async function loadPipelineList(){
+  try {
+    const data = await api("/analytics/pipelines");
+    const select = $("#pipePick");
+    select.textContent = "";
+    data.pipelines.forEach((pipeline) => {
+      const option = document.createElement("option");
+      option.value = pipeline.name;
+      option.textContent = pipeline.name + "   " + pipeline.stages.join(" ");
+      select.appendChild(option);
+    });
+  } catch (err){ /* inspector simply stays empty */ }
+}
+
+$("#pipeRun").addEventListener("click", async () => {
+  try {
+    const data = await api("/analytics/" + $("#pipePick").value);
+    renderJson($("#pipeSrc"), data.pipeline);
+    renderJson($("#pipeOut"), data.result.slice(0, 8));
+  } catch (err){ toast(err.message, "error"); }
+});
+
+/* ============================================================ catalog */
+function buildFilter(){
+  const params = new URLSearchParams();
+  const query = $("#fQuery").value.trim();
+  const tag = $("#fTag").value.trim();
+  const country = $("#fCountry").value.trim();
+
+  if (query)   params.set("q", query);
+  if ($("#fGenre").value) params.set("genre", $("#fGenre").value);
+  if (tag)     params.set("tag", tag.toLowerCase());
+  if (country) params.set("publisher_country", country);
+  if ($("#fAvail").checked) params.set("available_only", "true");
+  params.set("sort", $("#fSort").value);
+  return params;
+}
+
+async function loadCatalog(){
+  const body = $("#tblCatalog");
+  lastFilter = buildFilter().toString();
+
+  const params = buildFilter();
+  params.set("limit", LIMIT);
+  params.set("skip", page * LIMIT);
+
+  let data;
+  try { data = await api("/books?" + params.toString()); }
+  catch (err){
+    stateRow(body, 6, "ph-warning-circle", "Could not load the catalog: " + err.message, true);
+    return;
+  }
+
+  $("#catalogCaption").textContent = NUM.format(data.total) + " titles match the current filters.";
+  if (!$("#fQuery").value && !$("#fGenre").value && !$("#fTag").value && !$("#fCountry").value && !$("#fAvail").checked){
+    $("#catalogLede").textContent =
+      NUM.format(data.total) + " titles in the library collection. Search, filter and sort to find what you need.";
+  }
+
+  if (!data.items.length){
+    stateRow(body, 6, "ph-magnifying-glass", "No titles match these filters. Try removing one.");
+    $("#pageStatus").textContent = "No results";
+  } else {
+    body.textContent = "";
+    data.items.forEach((book) => {
+      const tr = document.createElement("tr");
+      tr.dataset.id = book.id;
+      tr.tabIndex = 0;
+
+      /* Title is the primary field; the author sits beneath it rather than
+         competing as an equal-weight column. */
+      const titleCell = document.createElement("td");
+      titleCell.className = "truncate";
+      const titleLine = document.createElement("div");
+      titleLine.className = "row-title";
+      titleLine.textContent = book.title;
+      const authorLine = document.createElement("div");
+      authorLine.className = "row-sub";
+      /* loans_counted is present only when the aggregation produced this row,
+         so the count appears exactly when the ranking depends on it. */
+      authorLine.textContent =
+        ((book.authors || []).slice(0, 2).join(", ") || "Author unknown") +
+        (book.loans_counted === undefined ? "" : "  ·  " + book.loans_counted + " loans");
+      titleCell.appendChild(titleLine);
+      titleCell.appendChild(authorLine);
+      tr.appendChild(titleCell);
+
+      cell(tr, book.genre);
+      cell(tr, book.publication_year, "num");
+      cell(tr, book.price === null || book.price === undefined ? null : "\u20B9" + NUM.format(book.price), "num");
+      cell(tr, book.avg_rating, "num");
+
+      const stock = document.createElement("td");
+      stock.className = "num";
+      if (!book.copies){
+        stock.textContent = "\u2013";
+      } else if (book.copies.available === 0){
+        const badge = document.createElement("span");
+        badge.className = "badge badge-neutral";
+        badge.textContent = "All on loan";
+        stock.appendChild(badge);
+      } else {
+        stock.textContent = book.copies.available + " of " + book.copies.total + " available";
+      }
+      tr.appendChild(stock);
+
+      const open = () => {
+        const previous = body.querySelector('tr[aria-selected="true"]');
+        if (previous) previous.removeAttribute("aria-selected");
+        tr.setAttribute("aria-selected", "true");
+        api("/books/" + book.id).then((doc) => renderJson($("#docOut"), doc)).catch(() => {});
+      };
+      tr.addEventListener("click", open);
+      tr.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " "){ event.preventDefault(); open(); }
+      });
+      body.appendChild(tr);
+    });
+
+    const from = data.skip + 1;
+    const to = Math.min(data.skip + LIMIT, data.total);
+    $("#pageStatus").textContent = from + " to " + to + " of " + NUM.format(data.total);
+  }
+
+  $("#pagePrev").disabled = page === 0;
+  $("#pageNext").disabled = (page + 1) * LIMIT >= data.total;
+
+  /* The backend reports which kind of query served this result. Sorting by
+     "Most borrowed" switches it from a standard query to an aggregation. */
+  const isAggregation = data.query_type === "aggregation pipeline";
+  $("#queryTypeNote").textContent = "Query type: " + (data.query_type || "standard query") +
+    ". " + (data.why || "");
+  $("#pipelineDisclose").hidden = !isAggregation;
+  if (isAggregation){
+    $("#pipelineStages").textContent = (data.stages || []).join(" ");
+    renderJson($("#pipelineOut"), data.pipeline);
+  }
+
+  try {
+    const plan = await api("/books/explain?" + lastFilter);
+    const usedIndex = JSON.stringify(plan.winning_plan).indexOf("IXSCAN") !== -1;
+    $("#planStage").textContent = usedIndex ? "IXSCAN" : "COLLSCAN";
+    renderJson($("#planOut"), {
+      stage: usedIndex ? "IXSCAN (an index served this query)" : "COLLSCAN (full collection scan)",
+      filter: plan.filter,
+      documents_examined: plan.docs_examined,
+      index_keys_examined: plan.keys_examined,
+      documents_returned: plan.docs_returned,
+      server_milliseconds: plan.millis
+    });
+  } catch (err){ /* the plan is supplementary */ }
+}
+
+$("#filters").addEventListener("submit", (event) => { event.preventDefault(); page = 0; loadCatalog(); });
+$("#pageNext").addEventListener("click", () => { page += 1; loadCatalog(); });
+$("#pagePrev").addEventListener("click", () => { if (page > 0){ page -= 1; loadCatalog(); } });
+
+/* ============================================================ circulation */
+$("#loginForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    const data = await api("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email: $("#loginUser").value, password: $("#loginPass").value })
+    });
+    TOKEN = data.access_token;
+    ME = data.user;
+
+    const identity = $("#identity");
+    identity.textContent = "";
+    const badge = document.createElement("span");
+    badge.className = "badge badge-accent";
+    badge.textContent = ME.role;
+    const name = document.createElement("strong");
+    name.textContent = ME.name;
+    identity.appendChild(badge);
+    identity.appendChild(name);
+
+    toast("Signed in as " + ME.name + ".");
+    loadLoans();
+  } catch (err){ toast(err.message, "error"); }
+});
+
+async function loadIssueOptions(term){
+  const params = new URLSearchParams({ available_only: "true", limit: "25", sort: "popularity:desc" });
+  if (term) params.set("q", term);
+  try {
+    const data = await api("/books?" + params.toString());
+    const select = $("#issueBook");
+    select.textContent = "";
+    data.items.forEach((book) => {
+      const option = document.createElement("option");
+      option.value = book.id;
+      option.textContent = book.title + "   (" + book.copies.available + " free)";
+      select.appendChild(option);
+    });
+  } catch (err){ /* non-fatal */ }
+}
+
+$("#issueSearch").addEventListener("keydown", (event) => {
+  if (event.key === "Enter"){ event.preventDefault(); loadIssueOptions(event.target.value.trim()); }
+});
+
+$("#issueForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!TOKEN){ toast("Sign in before issuing a title.", "error"); return; }
+  try {
+    const data = await api("/borrow", {
+      method: "POST",
+      body: JSON.stringify({ user_id: ME.id, book_id: $("#issueBook").value })
+    });
+    renderJson($("#txOut"), data);
+    toast("Issued. Stock is now " + data.book.available_after + ".");
+    loadLoans();
+    loadIssueOptions($("#issueSearch").value.trim());
+  } catch (err){
+    renderJson($("#txOut"), err.data || { error: err.message });
+    toast(err.message, "error");
+  }
+});
+
+$("#issueFail").addEventListener("click", async () => {
+  if (!TOKEN){ toast("Sign in before running the demonstration.", "error"); return; }
+  try {
+    const data = await api("/borrow/demo-failure", {
+      method: "POST",
+      body: JSON.stringify({ user_id: ME.id, book_id: $("#issueBook").value })
+    });
+    renderJson($("#txOut"), data);
+    if (data.rolled_back){
+      toast("Transaction aborted. Stock unchanged at " + data.copies_available_after + ".");
+    } else {
+      toast("The rollback did not occur.", "error");
+    }
+  } catch (err){
+    renderJson($("#txOut"), err.data || { error: err.message });
+    toast(err.message, "error");
+  }
+});
+
+async function loadLoans(){
+  const body = $("#tblLoans");
+  if (!TOKEN || !ME) return;
+
+  let data;
+  try { data = await api("/users/" + ME.id + "/history"); }
+  catch (err){ stateRow(body, 5, "ph-warning-circle", "Could not load loans: " + err.message, true); return; }
+
+  const rows = data.items.slice(0, 12);
+  if (!rows.length){ stateRow(body, 5, "ph-tray", "No loans on this account yet."); return; }
+
+  body.textContent = "";
+  rows.forEach((record) => {
+    const overdue = record.status === "borrowed" && new Date(record.due_date) < new Date();
+    const tr = document.createElement("tr");
+    cell(tr, record.book.title, "truncate");
+    cell(tr, record.borrowed_at.slice(0, 10));
+    cell(tr, record.due_date.slice(0, 10));
+
+    const statusCell = document.createElement("td");
+    const badge = document.createElement("span");
+    badge.className = "badge " + (record.status === "returned" ? "badge-ok" : overdue ? "badge-danger" : "badge-warn");
+    badge.textContent = record.status === "returned" ? "Returned" : overdue ? "Overdue" : "On loan";
+    statusCell.appendChild(badge);
+    tr.appendChild(statusCell);
+
+    const actionCell = document.createElement("td");
+    if (record.status === "borrowed"){
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "btn btn-ghost btn-sm";
+      button.textContent = "Return";
+      button.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        button.disabled = true;
+        try {
+          const result = await api("/borrow/return", {
+            method: "POST",
+            body: JSON.stringify({ borrow_id: record.id, rating: 4 })
+          });
+          renderJson($("#txOut"), result);
+          toast("Returned. Average rating recalculated to " + result.book.avg_rating + ".");
+          loadLoans();
+        } catch (err){ button.disabled = false; toast(err.message, "error"); }
+      });
+      actionCell.appendChild(button);
+    }
+    tr.appendChild(actionCell);
+    body.appendChild(tr);
+  });
+}
+
+/* ============================================================ change stream */
+let stream = null;
+
+function setConnection(state, label){
+  $("#conn").dataset.state = state;
+  $("#connText").textContent = label;
+}
+
+function connectStream(){
+  if (stream) return;
+  stream = new EventSource("/stream/events");
+
+  stream.addEventListener("ready", () => setConnection("live", "Connected"));
+
+  stream.addEventListener("change", (event) => {
+    const data = JSON.parse(event.data);
+    const feed = $("#feed");
+    if (feed.querySelector(".empty")) feed.textContent = "";
+
+    const item = document.createElement("li");
+    item.className = "fresh";
+
+    const when = document.createElement("div");
+    when.className = "when";
+    when.textContent = new Date().toLocaleTimeString();
+
+    const content = document.createElement("div");
+    const what = document.createElement("div");
+    what.className = "what";
+    what.textContent = data.description;
+
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    meta.textContent = data.operation + " on " + data.collection +
+      (data.updated_fields ? "   " + data.updated_fields.join(", ") : "");
+
+    content.appendChild(what);
+    content.appendChild(meta);
+    item.appendChild(when);
+    item.appendChild(content);
+    feed.prepend(item);
+
+    while (feed.children.length > 50) feed.removeChild(feed.lastChild);
+  });
+
+  stream.onerror = () => setConnection("retry", "Reconnecting");
+}
+
+/* ============================================================ boot */
+(async function boot(){
+  try {
+    const meta = await api("/api/demo-accounts");
+
+    const accounts = $("#loginUser");
+    accounts.textContent = "";
+    (meta.accounts || []).forEach((account) => {
+      const option = document.createElement("option");
+      option.value = account.email;
+      option.textContent = account.role + "   " + account.name;
+      accounts.appendChild(option);
+    });
+
+    const genres = $("#fGenre");
+    (meta.genres || []).forEach((genre) => {
+      const option = document.createElement("option");
+      option.value = genre;
+      option.textContent = genre;
+      genres.appendChild(option);
+    });
+  } catch (err){ /* non-fatal */ }
+
+  await loadOverview();
+  await loadPipelineList();
+  await loadCatalog();
+  await loadIssueOptions("");
+  await loadIndexes();
+  await loadStreamInfo();
+  connectStream();
+})();
+
+/* ============================================================ dev panels */
+const INDEX_TYPE = (index) => {
+  if (index.text_weights) return "text, weighted";
+  if (index.unique) return "unique";
+  if (index.partial_filter) return "partial";
+  if (index.keys.length > 1) return "compound";
+  return "single field";
+};
+
+async function loadIndexes(){
+  let data;
+  try { data = await api("/api/indexes"); }
+  catch (err){ stateRow($("#tblIndexes"), 4, "ph-warning-circle", "Could not read indexes: " + err.message, true); return; }
+
+  $("#indexCount").textContent = data.total + " across 4 collections";
+
+  const body = $("#tblIndexes");
+  body.textContent = "";
+
+  Object.keys(data.collections).forEach((name) => {
+    data.collections[name].forEach((index) => {
+      const tr = document.createElement("tr");
+      cell(tr, name);
+      cell(tr, index.name);
+      cell(tr, index.keys.map((k) => k[0] + ": " + k[1]).join(", "));
+
+      const type = document.createElement("td");
+      const badge = document.createElement("span");
+      badge.className = "badge " + (index.name === "_id_" ? "badge-neutral" : "badge-accent");
+      badge.textContent = index.name === "_id_" ? "automatic" : INDEX_TYPE(index);
+      type.appendChild(badge);
+
+      if (index.partial_filter){
+        const detail = document.createElement("div");
+        detail.className = "row-sub";
+        detail.textContent = JSON.stringify(index.partial_filter);
+        type.appendChild(detail);
+      }
+      if (index.text_weights){
+        const detail = document.createElement("div");
+        detail.className = "row-sub";
+        detail.textContent = JSON.stringify(index.text_weights);
+        type.appendChild(detail);
+      }
+      tr.appendChild(type);
+      body.appendChild(tr);
+    });
+  });
+}
+
+async function loadStreamInfo(){
+  try {
+    const info = await api("/stream/info");
+    $("#streamOp").textContent = info.watching.join(", ");
+    renderJson($("#streamOut"), {
+      watching: info.watching,
+      operations: info.operations,
+      transport: info.transport,
+      requires: info.requires,
+      pipeline: info.pipeline
+    });
+  } catch (err){ $("#streamOut").textContent = "Could not load the watch configuration."; }
+}
+</script>
+</body>
+</html>
