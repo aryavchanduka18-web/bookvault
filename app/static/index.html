@@ -70,6 +70,9 @@
 }
 
 *,*::before,*::after{box-sizing:border-box}
+/* The hidden attribute loses to any rule that sets display (.btn does), so a
+   button marked hidden stayed on screen. This makes hidden always win. */
+[hidden]{display:none !important}
 html{-webkit-text-size-adjust:100%}
 body{
   margin:0; background:var(--bg); color:var(--text);
@@ -186,9 +189,25 @@ main{max-width:1440px; margin:0 auto; padding:var(--s-5)}
 .btn-ghost{border-color:var(--border); color:var(--text-secondary)}
 .btn .ph{font-size:16px}
 .btn-sm{height:32px; padding:0 var(--s-3); font-size:13px}
+.btn-danger{border-color:var(--danger); color:var(--danger)}
+.btn-danger:hover{background:var(--danger-wash)}
+/* armed = the user has clicked once and must click again to confirm */
+.btn-danger.armed{background:var(--danger); border-color:var(--danger); color:#fff}
+.btn-danger.armed:hover{background:#8a1419}
+
+.form-grid{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:var(--s-3); margin-bottom:var(--s-4);
+}
+.form-error{
+  margin:0 0 var(--s-3); padding:var(--s-3); font-size:13px;
+  color:var(--danger); background:var(--danger-wash);
+  border:1px solid var(--danger); border-radius:var(--radius-sm);
+}
+.form-error[hidden]{display:none}
 
 label.field{display:flex; flex-direction:column; gap:var(--s-2); font-size:12px; color:var(--text-secondary)}
-input[type="text"],input[type="search"],input[type="password"],select{
+input[type="text"],input[type="search"],input[type="password"],input[type="number"],select{
   height:40px; padding:0 var(--s-3); font:400 14px/1 var(--sans);
   color:var(--text); background:var(--surface);
   border:1px solid var(--border-strong); border-radius:var(--radius-sm); width:100%;
@@ -338,6 +357,7 @@ pre{
     <button class="tab" role="tab" id="tab-overview"    aria-controls="panel-overview"    aria-selected="true">Overview</button>
     <button class="tab" role="tab" id="tab-catalog"     aria-controls="panel-catalog"     aria-selected="false" tabindex="-1">Catalog</button>
     <button class="tab" role="tab" id="tab-circulation" aria-controls="panel-circulation" aria-selected="false" tabindex="-1">Circulation</button>
+    <button class="tab" role="tab" id="tab-manage"      aria-controls="panel-manage"      aria-selected="false" tabindex="-1" hidden>Manage</button>
     <button class="tab" role="tab" id="tab-activity"    aria-controls="panel-activity"    aria-selected="false" tabindex="-1">Activity</button>
   </div>
 
@@ -615,6 +635,70 @@ pre{
   </div>
 </section>
 
+<!-- ====================================================== MANAGE -->
+<section class="panel" id="panel-manage" role="tabpanel" aria-labelledby="tab-manage" tabindex="0" hidden>
+  <div class="page-head">
+    <h1>Manage catalog</h1>
+    <p>Add new titles, correct existing ones, or remove a title the library no longer holds. Available to librarians and administrators.</p>
+  </div>
+
+  <div class="grid grid-full">
+    <div class="card">
+      <div class="card-head"><h2>Find a title to edit</h2><span class="op">PATCH · DELETE</span></div>
+      <div class="filter-bar">
+        <label class="field">Search<input type="search" id="mSearch" placeholder="type a title, author or tag" autocomplete="off"></label>
+        <label class="field">Title<select id="mBook"></select></label>
+        <div class="actions"><button class="btn" type="button" id="mLoad"><i class="ph ph-pencil-simple" aria-hidden="true"></i>Edit this title</button></div>
+      </div>
+      <p class="chart-note" id="mMatches" role="status" aria-live="polite" style="margin-top:0">Type a title, author or tag to find a book to edit, or fill in the form below to add a new one.</p>
+    </div>
+  </div>
+
+  <div class="grid grid-full">
+    <div class="card">
+      <div class="card-head">
+        <h2 id="mHeading">Add a title</h2>
+        <span class="badge badge-accent" id="mMode">New title</span>
+      </div>
+      <form id="manageForm" novalidate>
+        <div class="form-grid">
+          <label class="field">Title<input type="text" id="mfTitle" maxlength="300"></label>
+          <label class="field">Authors, separated by commas<input type="text" id="mfAuthors"></label>
+          <label class="field">Genre<select id="mfGenre"></select></label>
+          <label class="field">Year published<input type="number" id="mfYear" min="1450" max="2100" step="1"></label>
+          <label class="field">Price in rupees<input type="number" id="mfPrice" min="0" step="0.01"></label>
+          <label class="field">Publisher<input type="text" id="mfPublisher"></label>
+          <label class="field">Publisher country<input type="text" id="mfCountry"></label>
+          <label class="field">Copies held<input type="number" id="mfCopies" min="0" step="1"></label>
+          <label class="field">Tags, separated by commas<input type="text" id="mfTags"></label>
+        </div>
+        <p class="form-error" id="mfError" role="alert" hidden></p>
+        <div class="actions" style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary" type="submit" id="mfSubmit"><i class="ph ph-plus" aria-hidden="true"></i><span id="mfSubmitLabel">Add title</span></button>
+          <button class="btn" type="button" id="mfClear">Clear form</button>
+          <button class="btn btn-danger" type="button" id="mfDelete" hidden><i class="ph ph-trash" aria-hidden="true"></i><span id="mfDeleteLabel">Delete title</span></button>
+        </div>
+        <p class="chart-note" id="mfNote"></p>
+      </form>
+    </div>
+  </div>
+
+  <div class="inspector" id="inspManage" hidden>
+    <div class="inspector-head"><i class="ph ph-code" aria-hidden="true"></i> Developer view</div>
+    <details class="disclose" open>
+      <summary><i class="ph ph-caret-right" aria-hidden="true"></i> Last write request and response<span class="op" id="mOp">insert_one · find_one_and_update · delete_one</span></summary>
+      <div class="disclose-body">
+        <p class="chart-note" style="margin:0 0 12px">
+          Each action maps to one PyMongo call. Python checks the form first, and MongoDB then enforces
+          its own <code>$jsonSchema</code> validator on the write. The validator is what rejects bad data
+          that reaches the database by any other route.
+        </p>
+        <pre id="mOut">Add, edit or delete a title to see the request and the response.</pre>
+      </div>
+    </details>
+  </div>
+</section>
+
 <!-- ====================================================== ACTIVITY -->
 <section class="panel" id="panel-activity" role="tabpanel" aria-labelledby="tab-activity" tabindex="0" hidden>
   <div class="page-head">
@@ -763,18 +847,21 @@ function selectTab(tab){
 tabs.forEach((tab) => {
   tab.addEventListener("click", () => selectTab(tab));
   tab.addEventListener("keydown", (event) => {
-    const index = tabs.indexOf(tab);
+    /* The Manage tab is hidden for most accounts, and a hidden tab cannot
+       take focus, so arrow keys move through the visible tabs only. */
+    const visible = tabs.filter((t) => !t.hidden);
+    const index = visible.indexOf(tab);
     let next = null;
-    if (event.key === "ArrowRight") next = tabs[(index + 1) % tabs.length];
-    if (event.key === "ArrowLeft")  next = tabs[(index - 1 + tabs.length) % tabs.length];
-    if (event.key === "Home")       next = tabs[0];
-    if (event.key === "End")        next = tabs[tabs.length - 1];
+    if (event.key === "ArrowRight") next = visible[(index + 1) % visible.length];
+    if (event.key === "ArrowLeft")  next = visible[(index - 1 + visible.length) % visible.length];
+    if (event.key === "Home")       next = visible[0];
+    if (event.key === "End")        next = visible[visible.length - 1];
     if (next){ event.preventDefault(); next.focus(); selectTab(next); }
   });
 });
 
 /* ============================================================ developer view */
-const INSPECTORS = ["#inspOverview", "#inspCatalog", "#inspCirculation", "#inspActivity"];
+const INSPECTORS = ["#inspOverview", "#inspCatalog", "#inspCirculation", "#inspManage", "#inspActivity"];
 
 $("#devToggle").addEventListener("click", () => {
   DEV = !DEV;
@@ -1130,6 +1217,7 @@ $("#loginForm").addEventListener("submit", async (event) => {
     identity.appendChild(name);
 
     toast("Signed in as " + ME.name + ".");
+    showManageTab();
     loadLoans();
   } catch (err){ toast(err.message, "error"); }
 });
@@ -1291,6 +1379,258 @@ async function loadLoans(){
   });
 }
 
+/* ============================================================ manage catalog */
+const MANAGER_ROLES = ["librarian", "admin"];
+let editing = null;          /* the book being edited, or null when adding */
+let deleteArmed = false;
+let deleteTimer = null;
+let manageRequest = 0;
+
+/* The tab is only offered to roles the API will accept. The API enforces
+   this regardless; hiding the tab is a courtesy, not the security. */
+function showManageTab(){
+  const allowed = !!(ME && MANAGER_ROLES.indexOf(ME.role) !== -1);
+  $("#tab-manage").hidden = !allowed;
+  if (!allowed){
+    resetManageForm();
+    if (!$("#panel-manage").hidden) selectTab($("#tab-overview"));
+  }
+}
+
+function listFromText(text, lower){
+  return text.split(",").map((s) => s.trim()).filter(Boolean).map((s) => lower ? s.toLowerCase() : s);
+}
+
+function setManageError(message){
+  const node = $("#mfError");
+  node.textContent = message || "";
+  node.hidden = !message;
+}
+
+function errorText(err){
+  const detail = err.data && err.data.detail;
+  if (!detail) return err.message;
+  return err.message + ": " + (typeof detail === "string" ? detail : JSON.stringify(detail));
+}
+
+function recordWrite(method, path, operation, body, status, response){
+  $("#mOp").textContent = operation;
+  renderJson($("#mOut"), {
+    mongodb_operation: operation,
+    request: { method: method, path: path, body: body === undefined ? null : body },
+    response: { status: status, body: response === undefined ? null : response }
+  });
+}
+
+function disarmDelete(){
+  deleteArmed = false;
+  clearTimeout(deleteTimer);
+  $("#mfDelete").classList.remove("armed");
+  $("#mfDeleteLabel").textContent = "Delete title";
+}
+
+function resetManageForm(){
+  editing = null;
+  disarmDelete();
+  $("#manageForm").reset();
+  $("#mHeading").textContent = "Add a title";
+  $("#mMode").textContent = "New title";
+  $("#mfSubmitLabel").textContent = "Add title";
+  $("#mfDelete").hidden = true;
+  $("#mfNote").textContent = "A new title starts with every copy available, and no loans or ratings.";
+  setManageError("");
+}
+
+function fillManageForm(book){
+  editing = book;
+  disarmDelete();
+  setManageError("");
+  $("#mfTitle").value = book.title || "";
+  $("#mfAuthors").value = (book.authors || []).join(", ");
+  $("#mfGenre").value = book.genre || "";
+  $("#mfYear").value = book.publication_year;
+  $("#mfPrice").value = book.price;
+  $("#mfPublisher").value = (book.publisher && book.publisher.name) || "";
+  $("#mfCountry").value = (book.publisher && book.publisher.country) || "";
+  $("#mfCopies").value = book.copies.total;
+  $("#mfTags").value = (book.tags || []).join(", ");
+
+  const onLoan = book.copies.total - book.copies.available;
+  $("#mHeading").textContent = "Edit title";
+  $("#mMode").textContent = "Editing";
+  $("#mfSubmitLabel").textContent = "Save changes";
+  $("#mfDelete").hidden = false;
+  $("#mfNote").textContent =
+    book.copies.available + " of " + book.copies.total + " copies are available and " + onLoan +
+    " on loan. Changing copies held adjusts availability by the same amount, and cannot go below the number on loan.";
+}
+
+async function loadManageOptions(term){
+  const select = $("#mBook");
+  const status = $("#mMatches");
+  if (!term){
+    select.textContent = "";
+    status.textContent = "Type a title, author or tag to find a book to edit, or fill in the form below to add a new one.";
+    return;
+  }
+
+  const mine = ++manageRequest;
+  const params = new URLSearchParams({ q: term, sort: "relevance", limit: "25" });
+  let data;
+  try { data = await api("/books?" + params.toString()); }
+  catch (err){ if (mine === manageRequest) status.textContent = "Could not search: " + err.message; return; }
+  if (mine !== manageRequest) return;
+
+  select.textContent = "";
+  data.items.forEach((book) => {
+    const option = document.createElement("option");
+    option.value = book.id;
+    option.textContent = book.title + "   (" + ((book.authors || [])[0] || "unknown author") + ")";
+    select.appendChild(option);
+  });
+
+  status.textContent = data.items.length
+    ? NUM.format(data.total) + " matches, best match first. Choose one and press Edit this title."
+    : "No title matches \"" + term + "\". Try fewer or different words.";
+}
+
+async function loadBookIntoForm(){
+  const id = $("#mBook").value;
+  if (!id){ toast("Search for a title first.", "error"); return; }
+  try { fillManageForm(await api("/books/" + id)); }
+  catch (err){ toast("Could not load that title: " + err.message, "error"); }
+}
+
+function refreshAfterWrite(){
+  loadCatalog();
+  loadIssueOptions($("#issueSearch").value.trim());
+  loadOverview();
+}
+
+let manageTimer = null;
+$("#mSearch").addEventListener("input", (event) => {
+  clearTimeout(manageTimer);
+  const term = event.target.value.trim();
+  manageTimer = setTimeout(() => loadManageOptions(term), 300);
+});
+$("#mSearch").addEventListener("keydown", (event) => {
+  if (event.key === "Enter"){ event.preventDefault(); loadManageOptions(event.target.value.trim()); }
+});
+$("#mBook").addEventListener("change", loadBookIntoForm);
+$("#mLoad").addEventListener("click", loadBookIntoForm);
+$("#mfClear").addEventListener("click", resetManageForm);
+
+$("#manageForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  setManageError("");
+
+  if (!TOKEN || !ME || MANAGER_ROLES.indexOf(ME.role) === -1){
+    setManageError("Sign in as a librarian or administrator first.");
+    return;
+  }
+
+  /* Quick checks so the obvious mistakes get a plain message. Everything
+     else is left to the server, which validates again, and then to
+     MongoDB's own validator. */
+  const title = $("#mfTitle").value.trim();
+  const authors = listFromText($("#mfAuthors").value);
+  const year = parseInt($("#mfYear").value, 10);
+  const price = parseFloat($("#mfPrice").value);
+  const publisherName = $("#mfPublisher").value.trim();
+  const country = $("#mfCountry").value.trim();
+  const total = parseInt($("#mfCopies").value, 10);
+
+  if (!title){ setManageError("Enter a title."); return; }
+  if (!authors.length){ setManageError("Enter at least one author."); return; }
+  if (Number.isNaN(year)){ setManageError("Enter the year published as a whole number."); return; }
+  if (Number.isNaN(price) || price < 0){ setManageError("Enter a price of zero or more."); return; }
+  if (!publisherName){ setManageError("Enter the publisher."); return; }
+  if (Number.isNaN(total) || total < 0){ setManageError("Enter how many copies the library holds."); return; }
+
+  /* Copies held and copies available are different numbers. When editing,
+     keep the number on loan fixed and move availability with the total. */
+  let available = total;
+  if (editing){
+    available = editing.copies.available + (total - editing.copies.total);
+    if (available < 0){
+      const onLoan = editing.copies.total - editing.copies.available;
+      setManageError("That would leave fewer copies than are on loan right now (" + onLoan + "). Copies held cannot go below " + onLoan + ".");
+      return;
+    }
+  }
+
+  const publisher = { name: publisherName };
+  if (country) publisher.country = country;
+
+  const payload = {
+    title: title,
+    authors: authors,
+    genre: $("#mfGenre").value,
+    publication_year: year,
+    price: price,
+    publisher: publisher,
+    copies: { total: total, available: available },
+    tags: listFromText($("#mfTags").value, true)
+  };
+
+  const method = editing ? "PATCH" : "POST";
+  const path = editing ? "/books/" + editing.id : "/books";
+  const operation = editing ? "find_one_and_update with $set" : "insert_one";
+
+  const button = $("#mfSubmit");
+  button.disabled = true;
+  try {
+    const saved = await api(path, { method: method, body: JSON.stringify(payload) });
+    recordWrite(method, path, operation, payload, editing ? 200 : 201, saved);
+
+    if (editing){
+      toast("Saved changes to \"" + saved.title + "\".");
+      fillManageForm(saved);
+    } else {
+      toast("Added \"" + saved.title + "\" with " + saved.copies.total + " copies.");
+      resetManageForm();
+    }
+    refreshAfterWrite();
+  } catch (err){
+    recordWrite(method, path, operation, payload, err.status, err.data);
+    setManageError(errorText(err));
+  } finally {
+    button.disabled = false;
+  }
+});
+
+$("#mfDelete").addEventListener("click", async () => {
+  if (!editing) return;
+
+  /* Two clicks: the first arms the button, the second confirms. It disarms
+     itself after five seconds so a stray click later cannot delete. */
+  if (!deleteArmed){
+    deleteArmed = true;
+    $("#mfDelete").classList.add("armed");
+    $("#mfDeleteLabel").textContent = "Click again to confirm";
+    deleteTimer = setTimeout(disarmDelete, 5000);
+    return;
+  }
+
+  const target = editing;
+  const path = "/books/" + target.id;
+  disarmDelete();
+  try {
+    await api(path, { method: "DELETE" });
+    recordWrite("DELETE", path, "delete_one", undefined, 204, null);
+    toast("Deleted \"" + target.title + "\".");
+    resetManageForm();
+    $("#mBook").textContent = "";
+    $("#mMatches").textContent = "Deleted. Search again to find another title.";
+    refreshAfterWrite();
+  } catch (err){
+    recordWrite("DELETE", path, "delete_one", undefined, err.status, err.data);
+    setManageError(errorText(err));
+  }
+});
+
+resetManageForm();
+
 /* ============================================================ change stream */
 let stream = null;
 
@@ -1354,11 +1694,17 @@ function connectStream(){
     });
 
     const genres = $("#fGenre");
+    const formGenres = $("#mfGenre");
     (meta.genres || []).forEach((genre) => {
       const option = document.createElement("option");
       option.value = genre;
       option.textContent = genre;
       genres.appendChild(option);
+
+      const formOption = document.createElement("option");
+      formOption.value = genre;
+      formOption.textContent = genre;
+      formGenres.appendChild(formOption);
     });
   } catch (err){ /* non-fatal */ }
 

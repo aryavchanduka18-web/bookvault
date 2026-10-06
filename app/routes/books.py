@@ -369,7 +369,25 @@ def update_book(book_id: str):
 @bp.delete("/<book_id>")
 @require_role("librarian", "admin")
 def delete_book(book_id: str):
-    result = collection(BOOKS).delete_one({"_id": to_object_id(book_id, "book id")})
+    oid = to_object_id(book_id, "book id")
+
+    # Refuse to delete a book that is out on loan. The loan would be left
+    # pointing at a book that no longer exists, and the Most borrowed
+    # aggregation would silently drop it because its $lookup finds nothing.
+    # Deleting a user is guarded the same way. Uses the book_ref index.
+    open_loans = collection(BORROW_RECORDS).count_documents(
+        {"book.book_id": oid, "status": "borrowed"}
+    )
+    if open_loans:
+        raise ApiError(
+            409,
+            "book is currently on loan",
+            f"{open_loans} open loan(s); wait for the copies to be returned",
+        )
+
+    # Returned loans keep working after a delete: each one stores a snapshot
+    # of the title and authors (Extended Reference Pattern).
+    result = collection(BOOKS).delete_one({"_id": oid})
     if result.deleted_count == 0:
         raise ApiError(404, "book not found")
     return "", 204
