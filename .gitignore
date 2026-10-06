@@ -7,4 +7,5 @@ node_modules/
 *.log
 .pytest_cache/
 data/dumps/
+.claude-flow/
 .DS_Store
