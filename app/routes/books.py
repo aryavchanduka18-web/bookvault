@@ -179,6 +179,10 @@ def _build_projection() -> dict | None:
 
 def _build_sort() -> list[tuple[str, int]]:
     key, _, direction = request.args.get("sort", "added:desc").partition(":")
+    if key == "relevance":
+        # Relevance only means something with a text query; without one,
+        # fall back to newest first rather than rejecting the request.
+        return [("added_at", DESCENDING)]
     field = SORTABLE.get(key)
     if field is None:
         raise ApiError(400, f"sort key must be one of {sorted(SORTABLE)}")
@@ -273,6 +277,28 @@ def list_books():
         )
         body["pipeline"] = pipeline
         body["stages"] = [stage for doc in pipeline for stage in doc]
+    elif sort_key == "relevance" and request.args.get("q"):
+        # Rank by how well the text index matched, not by a stored field.
+        # $text ORs its terms, so "medical laboratory technology" matches any
+        # book containing any of the three words. The score is what puts the
+        # book matching all three, with a hit in the heavily weighted title,
+        # at the top.
+        score = {"score": {"$meta": "textScore"}}
+        requested = _build_projection()
+        projection = {**requested, **score} if requested else score
+        cursor = (
+            collection(BOOKS)
+            .find(query, projection)
+            .sort([("score", {"$meta": "textScore"})])
+            .skip(skip)
+            .limit(limit)
+        )
+        body["items"] = [doc_out(doc) for doc in cursor]
+        body["query_type"] = "standard query"
+        body["why"] = (
+            "find({$text}) ranked by the text index relevance score "
+            "(title weight 10, authors 5, tags 1)."
+        )
     else:
         # Everything else sorts a field already stored on the book document,
         # which an index can serve directly. No pipeline is needed.

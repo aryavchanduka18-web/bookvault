@@ -581,13 +581,14 @@ pre{
     <div class="card">
       <div class="card-head"><h2>Issue a title</h2><span class="op">multi-document transaction</span></div>
       <form class="filter-bar" id="issueForm">
-        <label class="field">Find a title<input type="search" id="issueSearch" placeholder="search, then press Enter"></label>
+        <label class="field">Find a title<input type="search" id="issueSearch" placeholder="type a title, author or tag" autocomplete="off"></label>
         <label class="field">Title<select id="issueBook"></select></label>
         <div class="actions">
           <button class="btn btn-primary" type="submit"><i class="ph ph-arrow-square-out" aria-hidden="true"></i>Issue</button>
           <button class="btn" type="button" id="issueFail"><i class="ph ph-arrow-u-up-left" aria-hidden="true"></i>Rollback demonstration</button>
         </div>
       </form>
+      <p class="chart-note" id="issueMatches" role="status" aria-live="polite" style="margin-top:0"></p>
       <p class="chart-note">The rollback demonstration aborts deliberately between the two writes. Choose a title with more than one copy free, otherwise the transaction stops earlier at the stock check.</p>
     </div>
   </div>
@@ -1133,29 +1134,76 @@ $("#loginForm").addEventListener("submit", async (event) => {
   } catch (err){ toast(err.message, "error"); }
 });
 
+let issueRequest = 0;
+
 async function loadIssueOptions(term){
-  const params = new URLSearchParams({ available_only: "true", limit: "25", sort: "popularity:desc" });
-  if (term) params.set("q", term);
-  try {
-    const data = await api("/books?" + params.toString());
-    const select = $("#issueBook");
-    select.textContent = "";
-    data.items.forEach((book) => {
-      const option = document.createElement("option");
-      option.value = book.id;
-      option.textContent = book.title + "   (" + book.copies.available + " free)";
-      select.appendChild(option);
-    });
-  } catch (err){ /* non-fatal */ }
+  /* With a search term: every match, best match first, including titles with
+     no copies free (shown but disabled, so the reason it cannot be issued is
+     visible). With no term: the most borrowed titles that can be issued. */
+  const params = new URLSearchParams({ limit: "25" });
+  if (term){
+    params.set("q", term);
+    params.set("sort", "relevance");
+  } else {
+    params.set("sort", "popularity:desc");
+    params.set("available_only", "true");
+  }
+
+  /* Ignore a slow response that arrives after a newer search. */
+  const mine = ++issueRequest;
+  const select = $("#issueBook");
+  const status = $("#issueMatches");
+
+  let data;
+  try { data = await api("/books?" + params.toString()); }
+  catch (err){ if (mine === issueRequest) status.textContent = "Could not search: " + err.message; return; }
+  if (mine !== issueRequest) return;
+
+  select.textContent = "";
+  data.items.forEach((book) => {
+    const free = book.copies.available;
+    const option = document.createElement("option");
+    option.value = book.id;
+    option.disabled = free === 0;
+    option.textContent = book.title + (free === 0 ? "   (all copies on loan)" : "   (" + free + " free)");
+    select.appendChild(option);
+  });
+
+  /* If the best match cannot be issued, select nothing. Otherwise the browser
+     silently picks the next enabled option and Issue would hand out a book
+     the user did not search for. */
+  if (select.options.length && select.options[0].disabled) select.selectedIndex = -1;
+
+  if (!term){
+    status.textContent = "Showing the most borrowed titles that have copies free. Type above to search the whole collection.";
+  } else if (!data.items.length){
+    status.textContent = "No title matches \"" + term + "\". Try fewer or different words.";
+  } else {
+    const best = data.items[0];
+    let message = NUM.format(data.total) + " matches, best match first.";
+    if (data.total > data.items.length) message += " Showing the first " + data.items.length + ".";
+    if (best.copies.available === 0) message += " The closest match has no copies free right now.";
+    status.textContent = message;
+  }
 }
 
 $("#issueSearch").addEventListener("keydown", (event) => {
   if (event.key === "Enter"){ event.preventDefault(); loadIssueOptions(event.target.value.trim()); }
 });
 
+/* Search as you type, after a short pause, so it does not look broken
+   when Enter is not pressed. */
+let issueTimer = null;
+$("#issueSearch").addEventListener("input", (event) => {
+  clearTimeout(issueTimer);
+  const term = event.target.value.trim();
+  issueTimer = setTimeout(() => loadIssueOptions(term), 300);
+});
+
 $("#issueForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!TOKEN){ toast("Sign in before issuing a title.", "error"); return; }
+  if (!$("#issueBook").value){ toast("Pick a title that has copies free.", "error"); return; }
   try {
     const data = await api("/borrow", {
       method: "POST",
@@ -1173,6 +1221,7 @@ $("#issueForm").addEventListener("submit", async (event) => {
 
 $("#issueFail").addEventListener("click", async () => {
   if (!TOKEN){ toast("Sign in before running the demonstration.", "error"); return; }
+  if (!$("#issueBook").value){ toast("Pick a title that has copies free.", "error"); return; }
   try {
     const data = await api("/borrow/demo-failure", {
       method: "POST",
