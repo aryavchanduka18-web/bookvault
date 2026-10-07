@@ -23,6 +23,7 @@ from flask import g, request
 
 from app.config import get_settings
 from app.core.errors import ApiError
+from app.core.mongoshell import call, record
 from app.db import USERS, collection
 
 ROLE_HIERARCHY = ["student", "librarian", "admin"]
@@ -113,7 +114,13 @@ def authenticate(email: str, password: str) -> dict:
     """Look up a user and check the password. Raises 401 on any failure."""
     from app.core.security import verify_password
 
-    user = collection(USERS).find_one({"email": email.strip().lower()})
+    lookup = {"email": email.strip().lower()}
+    record(
+        "Look up the account by email (served by the email_unique index). "
+        "MongoDB only finds the account; the password is checked afterwards in Python with bcrypt",
+        call(USERS, "findOne", lookup),
+    )
+    user = collection(USERS).find_one(lookup)
 
     # The same message whether the email is unknown or the password is
     # wrong, so this endpoint cannot be used to discover which addresses

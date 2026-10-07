@@ -206,6 +206,21 @@ main{max-width:1440px; margin:0 auto; padding:var(--s-5)}
 }
 .form-error[hidden]{display:none}
 
+/* access banner: tells the visitor why a page is locked, or confirms their role */
+.notice{
+  display:flex; align-items:center; gap:var(--s-3);
+  margin-bottom:var(--s-4); padding:var(--s-3) var(--s-4); font-size:13px;
+  border:1px solid var(--border); border-radius:var(--radius-md);
+  background:var(--surface-subtle); color:var(--text-secondary);
+}
+.notice strong{color:var(--text); font-weight:600}
+.notice[data-state="locked"]{background:var(--warn-wash); border-color:var(--warn); color:var(--warn)}
+.notice[data-state="locked"] strong{color:var(--warn)}
+.notice[data-state="open"]{background:var(--success-wash); border-color:var(--success); color:var(--success)}
+.notice[data-state="open"] strong{color:var(--success)}
+.notice .ph{font-size:18px; flex:none}
+input:disabled,select:disabled{background:var(--surface-subtle); color:var(--text-tertiary); cursor:not-allowed}
+
 label.field{display:flex; flex-direction:column; gap:var(--s-2); font-size:12px; color:var(--text-secondary)}
 input[type="text"],input[type="search"],input[type="password"],input[type="number"],select{
   height:40px; padding:0 var(--s-3); font:400 14px/1 var(--sans);
@@ -281,6 +296,12 @@ pre{
   tab-size:2;
 }
 .tok-key{color:#0043ce} .tok-str{color:#0e6027} .tok-num{color:#8a3800} .tok-lit{color:#6f6f6f}
+/* mongosh highlighting: comments, operators ($match), db.collection.method calls, constructors */
+.tok-com{color:#525252; font-style:italic}
+.tok-op{color:#6929c4}
+.tok-call{color:#0043ce; font-weight:600}
+.tok-fn{color:#161616; font-weight:600}
+pre.shell{max-height:420px}
 
 /* ---------------------------------------------------------------- chart */
 .chart-box{position:relative; height:240px}
@@ -325,6 +346,34 @@ pre{
   *,*::before,*::after{animation:none !important; transition:none !important}
 }
 
+/* ---------------------------------------------------------------- concepts */
+.concept-card{margin-bottom:var(--s-4)}
+.concept-card .lede{margin:0 0 var(--s-4); color:var(--text-secondary); max-width:80ch}
+.concept-card .lede code{font-family:var(--mono); font-size:12px}
+.concept-controls{display:flex; flex-wrap:wrap; gap:var(--s-3); align-items:end; margin-bottom:var(--s-4)}
+.concept-controls label.field{min-width:220px; flex:1 1 220px}
+.concept-out{margin-top:var(--s-3)}
+.concept-out .table-wrap + .table-wrap{margin-top:var(--s-3)}
+.cols-2{display:grid; grid-template-columns:repeat(2,1fr); gap:var(--s-4)}
+.pane{border:1px solid var(--border); border-radius:var(--radius-md); padding:var(--s-4); background:var(--surface)}
+.pane h3{font-size:13px; margin:0 0 var(--s-1)}
+.pane .sub{font-size:12px; color:var(--text-secondary); margin-bottom:var(--s-3)}
+.pane .metric{font-family:var(--mono); font-size:15px; font-weight:500; overflow-wrap:anywhere}
+.pane dl{margin:var(--s-3) 0 0; display:grid; grid-template-columns:auto 1fr; gap:var(--s-1) var(--s-4); font-size:13px}
+.pane dt{color:var(--text-secondary)}
+.pane dd{margin:0; font-family:var(--mono); text-align:right}
+.verdict{margin-top:var(--s-3); display:flex; flex-wrap:wrap; gap:var(--s-2); align-items:center; font-size:13px; color:var(--text-secondary)}
+.chips{display:flex; flex-wrap:wrap; gap:var(--s-1); margin-bottom:var(--s-2)}
+.bar{height:8px; background:var(--surface-subtle); border-radius:4px; min-width:120px; overflow:hidden}
+.bar > span{display:block; height:100%; background:var(--accent)}
+.case-list{display:flex; flex-wrap:wrap; gap:var(--s-2); margin-bottom:var(--s-4)}
+.reasons{margin:var(--s-2) 0 0; padding-left:var(--s-4); font-size:13px}
+.reasons li{margin-bottom:var(--s-1)}
+.stat-row{display:flex; flex-wrap:wrap; gap:var(--s-5); margin-bottom:var(--s-4)}
+.stat-row div{font-size:12px; color:var(--text-secondary)}
+.stat-row strong{display:block; font-family:var(--mono); font-size:18px; font-weight:500; color:var(--text)}
+@media (max-width:860px){ .cols-2{grid-template-columns:1fr} }
+
 /* ---------------------------------------------------------------- responsive */
 @media (max-width:1100px){ .grid-kpi{grid-template-columns:repeat(3,1fr)} }
 @media (max-width:860px){
@@ -355,9 +404,10 @@ pre{
 
   <div class="tabs" role="tablist" aria-label="Sections">
     <button class="tab" role="tab" id="tab-overview"    aria-controls="panel-overview"    aria-selected="true">Overview</button>
+    <button class="tab" role="tab" id="tab-concepts"    aria-controls="panel-concepts"    aria-selected="false" tabindex="-1">Concepts</button>
     <button class="tab" role="tab" id="tab-catalog"     aria-controls="panel-catalog"     aria-selected="false" tabindex="-1">Catalog</button>
     <button class="tab" role="tab" id="tab-circulation" aria-controls="panel-circulation" aria-selected="false" tabindex="-1">Circulation</button>
-    <button class="tab" role="tab" id="tab-manage"      aria-controls="panel-manage"      aria-selected="false" tabindex="-1" hidden>Manage</button>
+    <button class="tab" role="tab" id="tab-manage"      aria-controls="panel-manage"      aria-selected="false" tabindex="-1">Manage</button>
     <button class="tab" role="tab" id="tab-activity"    aria-controls="panel-activity"    aria-selected="false" tabindex="-1">Activity</button>
   </div>
 
@@ -460,6 +510,94 @@ pre{
   </div>
 </section>
 
+<!-- ====================================================== CONCEPTS -->
+<section class="panel" id="panel-concepts" role="tabpanel" aria-labelledby="tab-concepts" tabindex="0" hidden>
+  <div class="page-head">
+    <h1>Concepts</h1>
+    <p>Every card runs a real operation against MongoDB and shows the evidence on screen: the stored values, the measured sizes, the query plans, the rejections. Turn on Developer view to see the exact mongosh behind each one.</p>
+  </div>
+
+  <div class="card concept-card">
+    <div class="concept-controls" style="margin-bottom:0">
+      <label class="field">Book used by the cards below
+        <select id="cBook" aria-label="Book used by the cards below"></select>
+      </label>
+    </div>
+  </div>
+
+  <div class="card concept-card" id="cardComputed">
+    <div class="card-head"><h2>Computed Pattern</h2><span class="op">stored value vs recomputed value</span></div>
+    <p class="lede">The average rating and the counts are calculated once, when a loan is returned, and <strong>stored on the book</strong>. Pages then read them directly instead of aggregating every loan on every view. Below, MongoDB recomputes the same numbers from scratch so you can see they agree.</p>
+    <div class="concept-controls">
+      <button class="btn" type="button" id="btnComputed"><i class="ph ph-arrows-clockwise" aria-hidden="true"></i>Recheck stored vs live</button>
+      <button class="btn btn-primary" type="button" id="btnSimulate"><i class="ph ph-star" aria-hidden="true"></i>Simulate a 5-star return</button>
+    </div>
+    <div class="concept-out" id="computedOut"></div>
+    <div class="concept-out" id="simulateOut"></div>
+  </div>
+
+  <div class="card concept-card" id="cardExtended">
+    <div class="card-head"><h2>Extended Reference Pattern</h2><span class="op">snapshot inside the loan vs $lookup</span></div>
+    <p class="lede">Each loan keeps a <strong>copy of the book's title and authors</strong> next to the real reference (<code>book.book_id</code>). A loan history therefore needs one read, with no join. The price of the shortcut is that the copy can go stale if the book is edited later. That is a deliberate trade-off, because a loan should show the title as it was when the book was borrowed.</p>
+    <div class="concept-controls">
+      <label class="field">Loan<select id="cLoan" aria-label="Loan"></select></label>
+      <label class="field">Pretend the book is renamed to<input type="text" id="cRename" placeholder="optional, nothing is saved"></label>
+      <button class="btn btn-primary" type="button" id="btnExtended"><i class="ph ph-git-diff" aria-hidden="true"></i>Compare</button>
+    </div>
+    <div class="concept-out" id="extendedOut"></div>
+  </div>
+
+  <div class="card concept-card" id="cardOutlier">
+    <div class="card-head"><h2>Outlier Pattern</h2><span class="op">sizes measured with $bsonSize</span></div>
+    <p class="lede">A few popular books collect far more reviews than the rest. Embedding every review inside the book would make those documents grow without limit, and MongoDB caps a document at 16 MB. Books past the threshold are flagged <code>has_many_reviews</code> and their reviews move to <code>reviews_overflow</code>. The sizes below are measured by the database itself.</p>
+    <div class="concept-out" id="outlierOut"></div>
+  </div>
+
+  <div class="card concept-card" id="cardTypes">
+    <div class="card-head"><h2>BSON types, embedding and referencing</h2><span class="op">$type on every field</span></div>
+    <p class="lede">MongoDB itself reports the type of each stored field. The role column says whether the value is embedded in the document, a reference to another collection, a snapshot, or a computed value.</p>
+    <div class="concept-out" id="typesOut"></div>
+  </div>
+
+  <div class="card concept-card" id="cardIndex">
+    <div class="card-head"><h2>Index lab</h2><span class="op">planner choice vs forced full scan</span></div>
+    <p class="lede">The same query is run twice with <code>explain("executionStats")</code>: once as the query planner chooses, once forced to read the whole collection with <code>hint({ $natural: 1 })</code>. Compare how many documents each had to examine. Some presets deliberately have no index, so you can see what a missing index looks like.</p>
+    <div class="concept-controls">
+      <label class="field">Query<select id="cPreset" aria-label="Query preset"></select></label>
+      <button class="btn btn-primary" type="button" id="btnIndex"><i class="ph ph-gauge" aria-hidden="true"></i>Run both plans</button>
+    </div>
+    <div class="concept-out" id="indexOut"></div>
+  </div>
+
+  <div class="card concept-card" id="cardValidation">
+    <div class="card-head"><h2>Schema validation</h2><span class="op">$jsonSchema, error 121</span></div>
+    <p class="lede">Each button inserts a bad document <strong>straight into MongoDB</strong>, skipping every check the application normally does first. The database rejects it. The last button inserts a correct document to prove good data is accepted, and deletes it again. These inserts need a signed-in account.</p>
+    <div class="case-list" id="validCases"></div>
+    <div class="concept-out" id="validOut"></div>
+    <details class="disclose" style="margin-top:16px">
+      <summary><i class="ph ph-caret-right" aria-hidden="true"></i> The validator on the books collection<span class="op">$jsonSchema</span></summary>
+      <div class="disclose-body"><pre id="validatorShell" class="shell"></pre></div>
+    </details>
+  </div>
+
+  <div class="card concept-card" id="cardReplica">
+    <div class="card-head"><h2>Replica set</h2><span class="op">hello / replSetGetStatus</span></div>
+    <p class="lede">Atlas stores every collection on three servers. Writes go to the primary and copy to the secondaries. If the primary fails, the others elect a new one and the driver follows.</p>
+    <div class="concept-out" id="replicaOut"></div>
+  </div>
+
+  <div class="inspector" id="inspConcepts" hidden>
+    <div class="inspector-head"><i class="ph ph-code" aria-hidden="true"></i> Developer view</div>
+    <details class="disclose"><summary><i class="ph ph-caret-right" aria-hidden="true"></i> Computed Pattern queries<span class="op" id="opsComputedCount"></span></summary><div class="disclose-body"><pre id="opsComputed" class="shell">Run the card to see its queries.</pre></div></details>
+    <details class="disclose"><summary><i class="ph ph-caret-right" aria-hidden="true"></i> Extended Reference queries<span class="op" id="opsExtendedCount"></span></summary><div class="disclose-body"><pre id="opsExtended" class="shell">Run the card to see its queries.</pre></div></details>
+    <details class="disclose"><summary><i class="ph ph-caret-right" aria-hidden="true"></i> Outlier Pattern queries<span class="op" id="opsOutlierCount"></span></summary><div class="disclose-body"><pre id="opsOutlier" class="shell">Run the card to see its queries.</pre></div></details>
+    <details class="disclose"><summary><i class="ph ph-caret-right" aria-hidden="true"></i> BSON type queries<span class="op" id="opsTypesCount"></span></summary><div class="disclose-body"><pre id="opsTypes" class="shell">Run the card to see its queries.</pre></div></details>
+    <details class="disclose"><summary><i class="ph ph-caret-right" aria-hidden="true"></i> Index lab queries<span class="op" id="opsIndexCount"></span></summary><div class="disclose-body"><pre id="opsIndex" class="shell">Run the card to see its queries.</pre></div></details>
+    <details class="disclose"><summary><i class="ph ph-caret-right" aria-hidden="true"></i> Schema validation queries<span class="op" id="opsValidCount"></span></summary><div class="disclose-body"><pre id="opsValid" class="shell">Run the card to see its queries.</pre></div></details>
+    <details class="disclose"><summary><i class="ph ph-caret-right" aria-hidden="true"></i> Replica set commands<span class="op" id="opsReplicaCount"></span></summary><div class="disclose-body"><pre id="opsReplica" class="shell">Run the card to see its queries.</pre></div></details>
+  </div>
+</section>
+
 <!-- ====================================================== CATALOG -->
 <section class="panel" id="panel-catalog" role="tabpanel" aria-labelledby="tab-catalog" tabindex="0" hidden>
   <div class="page-head">
@@ -511,6 +649,17 @@ pre{
   <div class="inspector" id="inspCatalog" hidden>
     <div class="inspector-head"><i class="ph ph-code" aria-hidden="true"></i> Developer view</div>
     <details class="disclose" open>
+      <summary><i class="ph ph-caret-right" aria-hidden="true"></i> MongoDB queries run for this page<span class="op" id="catalogOpsCount"></span></summary>
+      <div class="disclose-body">
+        <p class="chart-note" style="margin:0 0 12px">
+          The exact operations the server sent to MongoDB to build the table above, written the way you
+          would type them in mongosh. They are generated from the same objects PyMongo executes, so they
+          cannot drift from the code. The last one is the query plan request.
+        </p>
+        <pre id="catalogOps" class="shell">Apply a filter to see the queries.</pre>
+      </div>
+    </details>
+    <details class="disclose" open>
       <summary><i class="ph ph-caret-right" aria-hidden="true"></i> Query plan<span class="op" id="planStage">explain()</span></summary>
       <div class="disclose-body">
         <p class="chart-note" style="margin:0 0 12px" id="queryTypeNote"></p>
@@ -557,6 +706,7 @@ pre{
           and <code>tags</code> as arrays, and the Computed Pattern fields
           <code>avg_rating</code>, <code>borrow_count</code> and <code>review_count</code>.
         </p>
+        <pre id="docOps" class="shell" style="margin-bottom:12px">// Select a row to see the query that reads it</pre>
         <pre id="docOut">Select a row in the table above.</pre>
       </div>
     </details>
@@ -629,6 +779,21 @@ pre{
   <div class="inspector" id="inspCirculation" hidden>
     <div class="inspector-head"><i class="ph ph-code" aria-hidden="true"></i> Developer view</div>
     <details class="disclose" open>
+      <summary><i class="ph ph-caret-right" aria-hidden="true"></i> MongoDB operations for the last action<span class="op" id="txOpsCount"></span></summary>
+      <div class="disclose-body">
+        <p class="chart-note" style="margin:0 0 12px">
+          Sign in, issue a title, run the rollback demonstration or return a title, and the operations appear
+          here. Issue and return open a transaction, run their writes through the session, and then commit.
+          The rollback demonstration ends with an abort instead.
+        </p>
+        <pre id="txOps" class="shell">// Sign in, issue, return or run the rollback demonstration to see the queries</pre>
+      </div>
+    </details>
+    <details class="disclose">
+      <summary><i class="ph ph-caret-right" aria-hidden="true"></i> Query behind the loans table<span class="op">no $lookup</span></summary>
+      <div class="disclose-body"><pre id="loanOps" class="shell">// Sign in to load the loans table</pre></div>
+    </details>
+    <details class="disclose" open>
       <summary><i class="ph ph-caret-right" aria-hidden="true"></i> Last transaction response<span class="op">JSON</span></summary>
       <div class="disclose-body"><pre id="txOut">Issue or return a title to see the response.</pre></div>
     </details>
@@ -641,6 +806,8 @@ pre{
     <h1>Manage catalog</h1>
     <p>Add new titles, correct existing ones, or remove a title the library no longer holds. Available to librarians and administrators.</p>
   </div>
+
+  <div class="notice" id="manageAccess" role="status" aria-live="polite"></div>
 
   <div class="grid grid-full">
     <div class="card">
@@ -685,6 +852,17 @@ pre{
 
   <div class="inspector" id="inspManage" hidden>
     <div class="inspector-head"><i class="ph ph-code" aria-hidden="true"></i> Developer view</div>
+    <details class="disclose" open>
+      <summary><i class="ph ph-caret-right" aria-hidden="true"></i> MongoDB operations for the last action<span class="op" id="manageOpsCount"></span></summary>
+      <div class="disclose-body">
+        <p class="chart-note" style="margin:0 0 12px">
+          Search, add, edit or delete a title and the queries it ran appear here, in the order MongoDB
+          received them. A delete shows its safety check first. If MongoDB rejects a write, the attempted
+          query is still shown.
+        </p>
+        <pre id="manageOps" class="shell">// Search for a title, or add, edit or delete one, to see the queries</pre>
+      </div>
+    </details>
     <details class="disclose" open>
       <summary><i class="ph ph-caret-right" aria-hidden="true"></i> Last write request and response<span class="op" id="mOp">insert_one · find_one_and_update · delete_one</span></summary>
       <div class="disclose-body">
@@ -764,6 +942,15 @@ async function api(path, options){
   if (TOKEN) headers["Authorization"] = "Bearer " + TOKEN;
 
   const response = await fetch(path, Object.assign({}, options, { headers: headers }));
+
+  /* The server lists the MongoDB operations a request ran in this header.
+     It is read before the status is checked, so a rejected write still shows
+     the query that was attempted. */
+  const operations = response.headers.get("X-MongoDB-Operations");
+  if (operations && typeof options.ops === "function"){
+    try { options.ops(JSON.parse(operations)); } catch (err){ /* display only */ }
+  }
+
   const text = await response.text();
   let data;
   try { data = JSON.parse(text); } catch (err) { data = text; }
@@ -808,6 +995,46 @@ function renderJson(target, value){
   target.appendChild(document.createTextNode(json.slice(cursor)));
 }
 
+/* mongosh text, highlighted. Built from DOM nodes only, like renderJson. */
+function renderShell(target, text){
+  target.textContent = "";
+  const pattern = new RegExp([
+    "(//[^\\n]*)",                                          /* 1 comment */
+    "(\"(?:\\\\.|[^\"\\\\])*\")",                           /* 2 string */
+    "\\b(ObjectId|NumberDecimal|ISODate)\\b",               /* 3 BSON constructor */
+    "(\\$[A-Za-z_]+)",                                      /* 4 operator */
+    "\\b((?:s?db)\\.[A-Za-z_]+\\.[A-Za-z]+|session\\.[A-Za-z]+)", /* 5 call target */
+    "(-?\\d+(?:\\.\\d+)?)",                                 /* 6 number */
+    "\\b(true|false|null)\\b"                               /* 7 literal */
+  ].join("|"), "g");
+  const classes = [null, "tok-com", "tok-str", "tok-fn", "tok-op", "tok-call", "tok-num", "tok-lit"];
+
+  let cursor = 0, match;
+  while ((match = pattern.exec(text)) !== null){
+    if (match.index > cursor) target.appendChild(document.createTextNode(text.slice(cursor, match.index)));
+    let group = 1;
+    while (group < classes.length && match[group] === undefined) group += 1;
+    const span = document.createElement("span");
+    span.className = classes[group];
+    span.textContent = match[0];
+    target.appendChild(span);
+    cursor = pattern.lastIndex;
+  }
+  target.appendChild(document.createTextNode(text.slice(cursor)));
+}
+
+/* ops is the list the server sent: [{label, code}, ...] */
+function renderOps(target, ops, countNode){
+  const text = ops.map((op) => "// " + op.label + "\n" + op.code).join("\n\n");
+  renderShell(target, text);
+  if (countNode) countNode.textContent = ops.length + (ops.length === 1 ? " operation" : " operations");
+}
+
+/* A callback for api({ ops }) that draws into a given panel. */
+function opsTo(preSelector, countSelector){
+  return (ops) => renderOps($(preSelector), ops, countSelector ? $(countSelector) : null);
+}
+
 function cell(row, text, className){
   const td = document.createElement("td");
   td.textContent = (text === null || text === undefined || text === "") ? "\u2013" : String(text);
@@ -842,6 +1069,7 @@ function selectTab(tab){
     document.getElementById(t.getAttribute("aria-controls")).hidden = !selected;
   });
   if (tab.id === "tab-activity") connectStream();
+  if (tab.id === "tab-concepts") loadConcepts();
 }
 
 tabs.forEach((tab) => {
@@ -860,8 +1088,375 @@ tabs.forEach((tab) => {
   });
 });
 
+/* ============================================================ concepts tab */
+function el(tag, className, text){
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined && text !== null) node.textContent = text;
+  return node;
+}
+function clear(node){ node.textContent = ""; return node; }
+function badge(text, kind){ return el("span", "badge badge-" + kind, text); }
+function fmt(value){ return value === null || value === undefined ? "null" : String(value); }
+function fmtBytes(n){
+  if (n === null || n === undefined) return "–";
+  if (n >= 1048576) return (n / 1048576).toFixed(1) + " MB";
+  if (n >= 1024) return (n / 1024).toFixed(1) + " KB";
+  return NUM.format(n) + " bytes";
+}
+function simpleTable(headers, rows){
+  const wrap = el("div", "table-wrap");
+  const table = el("table");
+  const head = el("tr");
+  headers.forEach((h) => { const th = el("th", null, h); th.scope = "col"; head.appendChild(th); });
+  table.appendChild(el("thead")).appendChild(head);
+  const body = el("tbody");
+  rows.forEach((row) => {
+    const tr = el("tr");
+    row.forEach((value) => {
+      const td = el("td");
+      if (value instanceof Node) td.appendChild(value); else td.textContent = value;
+      tr.appendChild(td);
+    });
+    body.appendChild(tr);
+  });
+  table.appendChild(body);
+  wrap.appendChild(table);
+  return wrap;
+}
+function needSignIn(){
+  if (TOKEN) return false;
+  toast("Sign in first (top right). This demo changes data inside a transaction, so it needs a login.", "error");
+  return true;
+}
+function showError(box, err){
+  clear(box);
+  const state = el("div", "error-state");
+  const icon = el("i", "ph ph-warning");
+  icon.setAttribute("aria-hidden", "true");
+  state.appendChild(icon);
+  state.appendChild(document.createTextNode(err.message || "Request failed"));
+  box.appendChild(state);
+}
+function conceptOps(name){ return opsTo("#ops" + name, "#ops" + name + "Count"); }
+function withButton(button, task){
+  button.disabled = true;
+  return task().finally(() => { button.disabled = false; });
+}
+
+async function checkComputed(){
+  const box = clear($("#computedOut"));
+  clear($("#simulateOut"));
+  try {
+    const d = await api("/concepts/computed/" + $("#cBook").value, { ops: conceptOps("Computed") });
+    const labels = [["Average rating", "avg_rating"], ["Rated loans (review count)", "review_count"], ["All loans (borrow count)", "borrow_count"]];
+    box.appendChild(simpleTable(
+      ["Field", "Stored on the book", "Recomputed from every loan now", "Result"],
+      labels.map((pair) => [pair[0], fmt(d.stored[pair[1]]), fmt(d.live[pair[1]]),
+        badge(d.matches[pair[1]] ? "match" : "differs", d.matches[pair[1]] ? "ok" : "warn")])
+    ));
+    if (d.note) box.appendChild(el("p", "chart-note", d.note));
+  } catch (err){ showError(box, err); }
+}
+
+async function simulateReturn(){
+  if (needSignIn()) return;
+  const box = clear($("#simulateOut"));
+  await withButton($("#btnSimulate"), async () => {
+    try {
+      const d = await api("/concepts/computed/" + $("#cBook").value + "/simulate",
+        { method: "POST", ops: conceptOps("Computed") });
+      const labels = [["Average rating", "avg_rating"], ["Rated loans (review count)", "review_count"], ["All loans (borrow count)", "borrow_count"]];
+      box.appendChild(el("p", "chart-note", "A temporary 5-star loan was saved inside a transaction, the stored values were recomputed, then the transaction was aborted."));
+      box.appendChild(simpleTable(
+        ["Field", "Before", "Inside the transaction", "After the abort"],
+        labels.map((pair) => [pair[0], fmt(d.before[pair[1]]), fmt(d.inside_transaction[pair[1]]), fmt(d.after_abort[pair[1]])])
+      ));
+      const verdict = el("div", "verdict");
+      verdict.appendChild(badge(d.rolled_back ? "Rolled back: nothing was saved" : "NOT rolled back", d.rolled_back ? "ok" : "danger"));
+      verdict.appendChild(document.createTextNode(d.temporary_loan_exists_after
+        ? "The temporary loan still exists." : "The temporary loan no longer exists."));
+      box.appendChild(verdict);
+    } catch (err){ showError(box, err); }
+  });
+}
+
+async function loadSampleLoans(){
+  try {
+    const d = await api("/concepts/sample-loans", { ops: conceptOps("Extended") });
+    const select = clear($("#cLoan"));
+    d.items.forEach((loan) => {
+      const option = el("option", null, loan.book.title.slice(0, 60) + " (" + loan.status + ")");
+      option.value = loan.id;
+      select.appendChild(option);
+    });
+  } catch (err){ toast("Could not load loans: " + err.message, "error"); }
+}
+
+async function compareLoan(){
+  const id = $("#cLoan").value;
+  const box = clear($("#extendedOut"));
+  if (!id) return;
+  await withButton($("#btnExtended"), async () => {
+    try {
+      const d = await api("/concepts/extended-reference/" + id, { ops: conceptOps("Extended") });
+      const cols = el("div", "cols-2");
+
+      const left = el("div", "pane");
+      left.appendChild(el("h3", null, "Without a join"));
+      left.appendChild(el("div", "sub", "1 query: findOne on borrow_records"));
+      left.appendChild(el("div", "metric", d.snapshot_title));
+      left.appendChild(el("div", "sub", "title read from the snapshot inside the loan"));
+      cols.appendChild(left);
+
+      const right = el("div", "pane");
+      right.appendChild(el("h3", null, "With $lookup"));
+      right.appendChild(el("div", "sub", "1 aggregation: borrow_records joined to books"));
+      right.appendChild(el("div", "metric", d.current_title || "(the book no longer exists)"));
+      right.appendChild(el("div", "sub", "title read from the books collection today"));
+      cols.appendChild(right);
+      box.appendChild(cols);
+
+      const verdict = el("div", "verdict");
+      verdict.appendChild(d.drifted ? badge("The book was renamed: the snapshot is older", "warn")
+                                    : badge("Snapshot and current title agree", "ok"));
+      box.appendChild(verdict);
+
+      const pretend = $("#cRename").value.trim();
+      if (pretend){
+        box.appendChild(el("p", "chart-note",
+          "Illustration only, nothing is saved: if this book were renamed to “" + pretend +
+          "”, the loan screen would still show “" + d.snapshot_title +
+          "”, while a $lookup would show “" + pretend + "”."));
+      }
+    } catch (err){ showError(box, err); }
+  });
+}
+
+async function loadOutliers(){
+  const box = clear($("#outlierOut"));
+  try {
+    const d = await api("/concepts/outliers", { ops: conceptOps("Outlier") });
+    const stats = el("div", "stat-row");
+    [["Outlier threshold", "> " + d.threshold + " reviews"],
+     ["Ordinary book (average)", fmtBytes(d.average_book_bytes)],
+     ["MongoDB document limit", fmtBytes(d.document_limit_bytes)]].forEach((pair) => {
+      const item = el("div", null, pair[0]);
+      item.insertBefore(el("strong", null, pair[1]), item.firstChild);
+      stats.appendChild(item);
+    });
+    box.appendChild(stats);
+
+    if (!d.items.length){
+      box.appendChild(el("p", "chart-note", "No outlier books exist yet."));
+    } else {
+      const widest = Math.max.apply(null, d.items.map((i) => i.if_embedded_bytes));
+      box.appendChild(simpleTable(
+        ["Book", "Book document", "Overflow bucket", "If embedded", "Compared with an ordinary book", "Reviews until 16 MB"],
+        d.items.map((i) => {
+          const bar = el("div", "bar");
+          const fill = el("span");
+          fill.style.width = Math.max(2, Math.round(i.if_embedded_bytes / widest * 100)) + "%";
+          bar.appendChild(fill);
+          const compare = el("div");
+          compare.appendChild(el("div", null, i.times_larger + "× larger"));
+          compare.appendChild(bar);
+          return [i.title, fmtBytes(i.book_document_bytes), fmtBytes(i.bucket_bytes) + " (" + i.overflow_reviews + " reviews)",
+                  fmtBytes(i.if_embedded_bytes), compare, i.reviews_to_hit_limit === null ? "–" : NUM.format(i.reviews_to_hit_limit)];
+        })
+      ));
+    }
+    box.appendChild(el("p", "chart-note", d.honest_note));
+  } catch (err){ showError(box, err); }
+}
+
+function rolePart(role){
+  /* An upper-case lead word (EMBEDDED, REFERENCE, COMPUTED...) becomes a badge. */
+  const match = /^([A-Z][A-Z ]*[A-Z])\b(.*)$/.exec(role);
+  const holder = el("span");
+  if (!match){ holder.textContent = role; return holder; }
+  holder.appendChild(badge(match[1], "accent"));
+  holder.appendChild(document.createTextNode(match[2]));
+  return holder;
+}
+
+async function loadTypes(){
+  const box = clear($("#typesOut"));
+  try {
+    const d = await api("/concepts/types/" + $("#cBook").value, { ops: conceptOps("Types") });
+    const rows = (list) => list.map((f) => [f.path, rolePart(f.role), badge(f.type, f.type === "objectId" ? "accent" : "neutral"), f.sample]);
+    box.appendChild(el("p", "chart-note", "Book: " + d.book.title));
+    box.appendChild(simpleTable(["Field", "Role", "BSON type", "Sample value"], rows(d.book_fields)));
+    if (d.loan_fields){
+      box.appendChild(el("p", "chart-note", "A loan that references this book:"));
+      box.appendChild(simpleTable(["Field", "Role", "BSON type", "Sample value"], rows(d.loan_fields)));
+    } else {
+      box.appendChild(el("p", "chart-note", "This book has no loans yet, so there is no loan to compare."));
+    }
+  } catch (err){ showError(box, err); }
+}
+
+function planPane(title, plan, error){
+  const pane = el("div", "pane");
+  pane.appendChild(el("h3", null, title));
+  if (!plan){
+    pane.appendChild(el("div", "sub", "Not possible"));
+    pane.appendChild(el("p", "chart-note", error || "No plan returned."));
+    return pane;
+  }
+  const chips = el("div", "chips");
+  plan.stages.forEach((stage) => chips.appendChild(badge(stage, stage === "COLLSCAN" ? "danger" : "ok")));
+  pane.appendChild(chips);
+  pane.appendChild(el("div", "sub", plan.index ? "index: " + plan.index : "no index used"));
+  const list = el("dl");
+  [["Documents examined", plan.docs_examined], ["Index keys examined", plan.keys_examined],
+   ["Documents returned", plan.returned], ["Time (ms)", plan.millis]].forEach((pair) => {
+    list.appendChild(el("dt", null, pair[0]));
+    list.appendChild(el("dd", null, fmt(pair[1])));
+  });
+  pane.appendChild(list);
+  return pane;
+}
+
+async function runIndexLab(){
+  const box = clear($("#indexOut"));
+  const select = $("#cPreset");
+  await withButton($("#btnIndex"), async () => {
+    try {
+      const d = await api("/concepts/index-lab?preset=" + encodeURIComponent(select.value || "genre"),
+        { ops: conceptOps("Index") });
+      if (!select.options.length){
+        Object.keys(d.presets).forEach((key) => {
+          const option = el("option", null, d.presets[key]);
+          option.value = key;
+          select.appendChild(option);
+        });
+        select.value = d.preset;
+      }
+      box.appendChild(el("p", "chart-note", "Filter: " + JSON.stringify(d.filter) + "  ·  collection size: " + NUM.format(d.collection_documents) + " documents"));
+      const cols = el("div", "cols-2");
+      cols.appendChild(planPane("Planner's own choice", d.planner));
+      cols.appendChild(planPane("Forced full scan  hint({ $natural: 1 })", d.forced_scan,
+        d.forced_scan_error ? "MongoDB refuses to combine a text query with a forced scan, because text search cannot run without its text index." : null));
+      box.appendChild(cols);
+      const verdict = el("div", "verdict");
+      if (d.forced_scan){
+        verdict.appendChild(badge(NUM.format(d.planner.docs_examined) + " vs " + NUM.format(d.forced_scan.docs_examined) + " documents examined",
+          d.planner.uses_index ? "ok" : "warn"));
+      }
+      verdict.appendChild(document.createTextNode(d.why));
+      box.appendChild(verdict);
+    } catch (err){ showError(box, err); }
+  });
+}
+
+function reasonLines(reasons){
+  /* Entries that carry only propertyName are path markers: collect them as the path of the next rule. */
+  const lines = [];
+  let path = [];
+  reasons.forEach((r) => {
+    if (r.propertyName && !r.operatorName && !r.reason){ path.push(r.propertyName); return; }
+    const where = path.length ? path.join(".") : "document";
+    if (r.missingProperties) lines.push("Required field missing: " + r.missingProperties.join(", "));
+    else lines.push(where + ": " + r.operatorName + " failed (" + r.reason + "), value " + JSON.stringify(r.consideredValue));
+    path = [];
+  });
+  return lines;
+}
+
+async function loadValidation(){
+  try {
+    const d = await api("/concepts/validation", { ops: conceptOps("Valid") });
+    renderShell($("#validatorShell"), d.validator_shell);
+    const list = clear($("#validCases"));
+    d.cases.forEach((c) => {
+      const button = el("button", c.key === "control" ? "btn btn-primary btn-sm" : "btn btn-sm", c.label);
+      button.type = "button";
+      button.title = c.detail;
+      button.addEventListener("click", () => attemptInsert(c, button));
+      list.appendChild(button);
+    });
+  } catch (err){ showError($("#validCases"), err); }
+}
+
+async function attemptInsert(item, button){
+  if (needSignIn()) return;
+  const box = clear($("#validOut"));
+  await withButton(button, async () => {
+    try {
+      const d = await api("/concepts/validation", { method: "POST", body: JSON.stringify({ case: item.key }), ops: conceptOps("Valid") });
+      const verdict = el("div", "verdict");
+      verdict.appendChild(d.accepted ? badge("Accepted, then deleted again", "ok") : badge("Rejected by MongoDB, error " + d.error_code, "danger"));
+      verdict.appendChild(document.createTextNode(item.detail));
+      box.appendChild(verdict);
+      if (!d.accepted){
+        const lines = reasonLines(d.reasons || []);
+        if (lines.length){
+          const ul = el("ul", "reasons");
+          lines.forEach((line) => ul.appendChild(el("li", null, line)));
+          box.appendChild(ul);
+        }
+        const more = el("details", "disclose");
+        more.style.marginTop = "12px";
+        const summary = el("summary", null, "Full error from the server");
+        more.appendChild(summary);
+        const body = el("div", "disclose-body");
+        const pre = el("pre");
+        renderJson(pre, d.detail);
+        body.appendChild(pre);
+        more.appendChild(body);
+        box.appendChild(more);
+      }
+    } catch (err){ showError(box, err); }
+  });
+}
+
+async function loadReplica(){
+  const box = clear($("#replicaOut"));
+  try {
+    const d = await api("/concepts/replica-set", { ops: conceptOps("Replica") });
+    const stats = el("div", "stat-row");
+    [["Replica set", d.set_name], ["Server version", d.version],
+     ["This app is connected to", (d.connected_to || "").split(".")[0] + (d.is_primary ? " (primary)" : "")]].forEach((pair) => {
+      const item = el("div", null, pair[0]);
+      item.insertBefore(el("strong", null, pair[1] || "–"), item.firstChild);
+      stats.appendChild(item);
+    });
+    box.appendChild(stats);
+    box.appendChild(simpleTable(["Member", "Role", "Health"],
+      d.members.map((m) => [m.name, badge(m.state, m.state === "PRIMARY" ? "ok" : "neutral"), m.health === 1 ? "healthy" : fmt(m.health)])));
+    box.appendChild(el("p", "chart-note", d.write_concern_note));
+  } catch (err){ showError(box, err); }
+}
+
+let conceptsLoaded = false;
+async function loadConcepts(){
+  if (conceptsLoaded) return;
+  conceptsLoaded = true;
+  try {
+    const data = await api("/books?sort=popularity&limit=40");
+    const select = clear($("#cBook"));
+    data.items.forEach((book) => {
+      const option = el("option", null, book.title.slice(0, 70));
+      option.value = book.id;
+      select.appendChild(option);
+    });
+  } catch (err){
+    conceptsLoaded = false;
+    toast("Could not load books: " + err.message, "error");
+    return;
+  }
+  loadOutliers(); loadReplica(); loadValidation(); loadSampleLoans(); runIndexLab(); checkComputed(); loadTypes();
+}
+
+$("#cBook").addEventListener("change", () => { checkComputed(); loadTypes(); });
+$("#btnComputed").addEventListener("click", checkComputed);
+$("#btnSimulate").addEventListener("click", simulateReturn);
+$("#btnExtended").addEventListener("click", compareLoan);
+$("#btnIndex").addEventListener("click", runIndexLab);
+
 /* ============================================================ developer view */
-const INSPECTORS = ["#inspOverview", "#inspCatalog", "#inspCirculation", "#inspManage", "#inspActivity"];
+const INSPECTORS = ["#inspOverview", "#inspConcepts", "#inspCatalog", "#inspCirculation", "#inspManage", "#inspActivity"];
 
 $("#devToggle").addEventListener("click", () => {
   DEV = !DEV;
@@ -1085,8 +1680,12 @@ async function loadCatalog(){
   params.set("skip", page * LIMIT);
 
   let data;
-  try { data = await api("/books?" + params.toString()); }
+  /* Every operation this refresh sends to MongoDB: the count, the find (or
+     aggregate), and then the query-plan request. */
+  const catalogOps = [];
+  try { data = await api("/books?" + params.toString(), { ops: (o) => catalogOps.push(...o) }); }
   catch (err){
+    renderOps($("#catalogOps"), catalogOps, $("#catalogOpsCount"));
     stateRow(body, 6, "ph-warning-circle", "Could not load the catalog: " + err.message, true);
     return;
   }
@@ -1148,7 +1747,9 @@ async function loadCatalog(){
         const previous = body.querySelector('tr[aria-selected="true"]');
         if (previous) previous.removeAttribute("aria-selected");
         tr.setAttribute("aria-selected", "true");
-        api("/books/" + book.id).then((doc) => renderJson($("#docOut"), doc)).catch(() => {});
+        api("/books/" + book.id, { ops: opsTo("#docOps") })
+          .then((doc) => renderJson($("#docOut"), doc))
+          .catch(() => {});
       };
       tr.addEventListener("click", open);
       tr.addEventListener("keydown", (event) => {
@@ -1177,7 +1778,7 @@ async function loadCatalog(){
   }
 
   try {
-    const plan = await api("/books/explain?" + lastFilter);
+    const plan = await api("/books/explain?" + lastFilter, { ops: (o) => catalogOps.push(...o) });
     const usedIndex = JSON.stringify(plan.winning_plan).indexOf("IXSCAN") !== -1;
     $("#planStage").textContent = usedIndex ? "IXSCAN" : "COLLSCAN";
     renderJson($("#planOut"), {
@@ -1189,6 +1790,8 @@ async function loadCatalog(){
       server_milliseconds: plan.millis
     });
   } catch (err){ /* the plan is supplementary */ }
+
+  renderOps($("#catalogOps"), catalogOps, $("#catalogOpsCount"));
 }
 
 $("#filters").addEventListener("submit", (event) => { event.preventDefault(); page = 0; loadCatalog(); });
@@ -1201,7 +1804,8 @@ $("#loginForm").addEventListener("submit", async (event) => {
   try {
     const data = await api("/auth/login", {
       method: "POST",
-      body: JSON.stringify({ email: $("#loginUser").value, password: $("#loginPass").value })
+      body: JSON.stringify({ email: $("#loginUser").value, password: $("#loginPass").value }),
+      ops: opsTo("#txOps", "#txOpsCount")
     });
     TOKEN = data.access_token;
     ME = data.user;
@@ -1295,7 +1899,8 @@ $("#issueForm").addEventListener("submit", async (event) => {
   try {
     const data = await api("/borrow", {
       method: "POST",
-      body: JSON.stringify({ user_id: ME.id, book_id: $("#issueBook").value })
+      body: JSON.stringify({ user_id: ME.id, book_id: $("#issueBook").value }),
+      ops: opsTo("#txOps", "#txOpsCount")
     });
     renderJson($("#txOut"), data);
     toast("Issued. Stock is now " + data.book.available_after + ".");
@@ -1313,7 +1918,8 @@ $("#issueFail").addEventListener("click", async () => {
   try {
     const data = await api("/borrow/demo-failure", {
       method: "POST",
-      body: JSON.stringify({ user_id: ME.id, book_id: $("#issueBook").value })
+      body: JSON.stringify({ user_id: ME.id, book_id: $("#issueBook").value }),
+      ops: opsTo("#txOps", "#txOpsCount")
     });
     renderJson($("#txOut"), data);
     if (data.rolled_back){
@@ -1332,7 +1938,7 @@ async function loadLoans(){
   if (!TOKEN || !ME) return;
 
   let data;
-  try { data = await api("/users/" + ME.id + "/history"); }
+  try { data = await api("/users/" + ME.id + "/history", { ops: opsTo("#loanOps") }); }
   catch (err){ stateRow(body, 5, "ph-warning-circle", "Could not load loans: " + err.message, true); return; }
 
   const rows = data.items.slice(0, 12);
@@ -1365,7 +1971,8 @@ async function loadLoans(){
         try {
           const result = await api("/borrow/return", {
             method: "POST",
-            body: JSON.stringify({ borrow_id: record.id, rating: 4 })
+            body: JSON.stringify({ borrow_id: record.id, rating: 4 }),
+            ops: opsTo("#txOps", "#txOpsCount")
           });
           renderJson($("#txOut"), result);
           toast("Returned. Average rating recalculated to " + result.book.avg_rating + ".");
@@ -1390,11 +1997,47 @@ let manageRequest = 0;
    this regardless; hiding the tab is a courtesy, not the security. */
 function showManageTab(){
   const allowed = !!(ME && MANAGER_ROLES.indexOf(ME.role) !== -1);
-  $("#tab-manage").hidden = !allowed;
-  if (!allowed){
-    resetManageForm();
-    if (!$("#panel-manage").hidden) selectTab($("#tab-overview"));
+
+  /* The tab is always visible so the access rule can be seen. When the role
+     is not allowed, every control on the page is disabled and a banner says
+     why. The API refuses the same requests regardless, so this is a courtesy
+     to the user, not the security. */
+  document.querySelectorAll("#panel-manage input, #panel-manage select, #panel-manage button")
+    .forEach((control) => { control.disabled = !allowed; });
+
+  const banner = $("#manageAccess");
+  banner.textContent = "";
+  const icon = document.createElement("i");
+  icon.className = "ph " + (allowed ? "ph-lock-open" : "ph-lock");
+  icon.setAttribute("aria-hidden", "true");
+  const message = document.createElement("span");
+
+  if (allowed){
+    banner.dataset.state = "open";
+    const lead = document.createElement("strong");
+    lead.textContent = "Access granted. ";
+    message.appendChild(lead);
+    message.appendChild(document.createTextNode(
+      "You are signed in as " + ME.name + " (" + ME.role + "). Changes made here write to the live database."));
+  } else if (ME){
+    banner.dataset.state = "locked";
+    const lead = document.createElement("strong");
+    lead.textContent = "Locked. ";
+    message.appendChild(lead);
+    message.appendChild(document.createTextNode(
+      "You are signed in as " + ME.name + " (" + ME.role + "). Only librarians and administrators can add, edit or delete titles. The API refuses these requests for your role as well."));
+  } else {
+    banner.dataset.state = "locked";
+    const lead = document.createElement("strong");
+    lead.textContent = "Locked. ";
+    message.appendChild(lead);
+    message.appendChild(document.createTextNode(
+      "Sign in as a librarian or administrator on the Circulation tab to manage titles."));
   }
+  banner.appendChild(icon);
+  banner.appendChild(message);
+
+  if (!allowed) resetManageForm();
 }
 
 function listFromText(text, lower){
@@ -1477,7 +2120,11 @@ async function loadManageOptions(term){
   const mine = ++manageRequest;
   const params = new URLSearchParams({ q: term, sort: "relevance", limit: "25" });
   let data;
-  try { data = await api("/books?" + params.toString()); }
+  try {
+    data = await api("/books?" + params.toString(), {
+      ops: (o) => { if (mine === manageRequest) renderOps($("#manageOps"), o, $("#manageOpsCount")); }
+    });
+  }
   catch (err){ if (mine === manageRequest) status.textContent = "Could not search: " + err.message; return; }
   if (mine !== manageRequest) return;
 
@@ -1497,7 +2144,7 @@ async function loadManageOptions(term){
 async function loadBookIntoForm(){
   const id = $("#mBook").value;
   if (!id){ toast("Search for a title first.", "error"); return; }
-  try { fillManageForm(await api("/books/" + id)); }
+  try { fillManageForm(await api("/books/" + id, { ops: opsTo("#manageOps", "#manageOpsCount") })); }
   catch (err){ toast("Could not load that title: " + err.message, "error"); }
 }
 
@@ -1580,7 +2227,11 @@ $("#manageForm").addEventListener("submit", async (event) => {
   const button = $("#mfSubmit");
   button.disabled = true;
   try {
-    const saved = await api(path, { method: method, body: JSON.stringify(payload) });
+    const saved = await api(path, {
+      method: method,
+      body: JSON.stringify(payload),
+      ops: opsTo("#manageOps", "#manageOpsCount")
+    });
     recordWrite(method, path, operation, payload, editing ? 200 : 201, saved);
 
     if (editing){
@@ -1616,7 +2267,7 @@ $("#mfDelete").addEventListener("click", async () => {
   const path = "/books/" + target.id;
   disarmDelete();
   try {
-    await api(path, { method: "DELETE" });
+    await api(path, { method: "DELETE", ops: opsTo("#manageOps", "#manageOpsCount") });
     recordWrite("DELETE", path, "delete_one", undefined, 204, null);
     toast("Deleted \"" + target.title + "\".");
     resetManageForm();
@@ -1630,6 +2281,7 @@ $("#mfDelete").addEventListener("click", async () => {
 });
 
 resetManageForm();
+showManageTab();
 
 /* ============================================================ change stream */
 let stream = null;

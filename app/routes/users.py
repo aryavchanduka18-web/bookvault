@@ -12,6 +12,7 @@ from pymongo import DESCENDING, ReturnDocument
 
 from app.core.auth import require_auth, require_role
 from app.core.errors import ApiError
+from app.core.mongoshell import call, find_call, record, redact
 from app.core.schema import MEMBERSHIPS, ROLES
 from app.core.security import hash_password
 from app.core.serializers import doc_out, to_object_id
@@ -79,6 +80,11 @@ def list_users():
     limit = arg_int(request.args, "limit", default=20, minimum=1, maximum=100)
     skip = arg_int(request.args, "skip", default=0, minimum=0)
 
+    record("Count every match, for the pager", call(USERS, "countDocuments", query))
+    record(
+        "Find this page of members (password hash excluded)",
+        find_call(USERS, query, PUBLIC, [("joined_at", DESCENDING)], skip, limit),
+    )
     cursor = (
         collection(USERS)
         .find(query, PUBLIC)
@@ -100,7 +106,9 @@ def list_users():
 @bp.get("/<user_id>")
 @require_role("librarian", "admin")
 def get_user(user_id: str):
-    doc = collection(USERS).find_one({"_id": to_object_id(user_id, "user id")}, PUBLIC)
+    oid = to_object_id(user_id, "user id")
+    record("Read one member by _id (password hash excluded)", call(USERS, "findOne", {"_id": oid}, PUBLIC))
+    doc = collection(USERS).find_one({"_id": oid}, PUBLIC)
     if doc is None:
         raise ApiError(404, "user not found")
     return jsonify(doc_out(doc))
@@ -116,6 +124,7 @@ def user_history(user_id: str):
     which does need $lookup because it reads present-day stock levels.
     """
     oid = to_object_id(user_id, "user id")
+    record("Check the member exists", call(USERS, "countDocuments", {"_id": oid}, {"limit": 1}))
     if collection(USERS).count_documents({"_id": oid}, limit=1) == 0:
         raise ApiError(404, "user not found")
 
@@ -124,6 +133,12 @@ def user_history(user_id: str):
     if status:
         query["status"] = status
 
+    # One query and no $lookup: each loan already holds the book's title and
+    # authors (Extended Reference Pattern).
+    record(
+        "Load this member's loans. One query, no $lookup, because each loan stores a snapshot of the book",
+        find_call(BORROW_RECORDS, query, None, [("borrowed_at", DESCENDING)]),
+    )
     cursor = collection(BORROW_RECORDS).find(query).sort([("borrowed_at", DESCENDING)])
     records = [doc_out(doc) for doc in cursor]
 
@@ -145,6 +160,7 @@ def create_user():
 
     # A duplicate email trips the unique index and becomes a 409 via the
     # global DuplicateKeyError handler.
+    record("Insert the new member (the bcrypt hash is hidden here)", call(USERS, "insertOne", redact(doc, "password_hash")))
     result = collection(USERS).insert_one(doc)
     created = collection(USERS).find_one({"_id": result.inserted_id}, PUBLIC)
     return jsonify(doc_out(created)), 201
@@ -154,9 +170,20 @@ def create_user():
 @require_role("admin")
 def update_user(user_id: str):
     changes = _user_payload(partial=True)
+    oid = to_object_id(user_id, "user id")
 
+    record(
+        "Update only the fields that were sent (the bcrypt hash is hidden here)",
+        call(
+            USERS,
+            "findOneAndUpdate",
+            {"_id": oid},
+            {"$set": redact(changes, "password_hash")},
+            {"projection": PUBLIC, "returnDocument": "after"},
+        ),
+    )
     doc = collection(USERS).find_one_and_update(
-        {"_id": to_object_id(user_id, "user id")},
+        {"_id": oid},
         {"$set": changes},
         projection=PUBLIC,
         return_document=ReturnDocument.AFTER,
@@ -172,12 +199,16 @@ def delete_user(user_id: str):
     oid = to_object_id(user_id, "user id")
 
     # Refuse to orphan an open loan.
-    open_loans = collection(BORROW_RECORDS).count_documents(
-        {"user_id": oid, "status": "borrowed"}
+    loan_filter = {"user_id": oid, "status": "borrowed"}
+    record(
+        "Safety check: does this member still have books on loan? (uses the user_status index)",
+        call(BORROW_RECORDS, "countDocuments", loan_filter),
     )
+    open_loans = collection(BORROW_RECORDS).count_documents(loan_filter)
     if open_loans:
         raise ApiError(409, "user still has books on loan", f"{open_loans} open loan(s)")
 
+    record("Delete the member", call(USERS, "deleteOne", {"_id": oid}))
     result = collection(USERS).delete_one({"_id": oid})
     if result.deleted_count == 0:
         raise ApiError(404, "user not found")

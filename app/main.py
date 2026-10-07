@@ -9,10 +9,11 @@ from flask_cors import CORS
 
 from app.config import get_settings
 from app.core.errors import register_error_handlers
+from app.core.mongoshell import attach as attach_operations
 from app.core.schema import GENRES
 from app.core.serializers import jsonable
 from app.db import ALL_COLLECTIONS, USERS, collection, get_client, get_db, ping
-from app.routes import analytics, auth, books, borrow, stream, users
+from app.routes import analytics, auth, books, borrow, concepts, stream, users
 
 
 def create_app() -> Flask:
@@ -25,7 +26,13 @@ def create_app() -> Flask:
 
     register_error_handlers(flask_app)
 
-    for blueprint in (auth.bp, books.bp, users.bp, borrow.bp, analytics.bp, stream.bp):
+    # Sends the MongoDB operations each request performed back to the browser
+    # for the Developer view. See app/core/mongoshell.py.
+    flask_app.after_request(attach_operations)
+
+    for blueprint in (
+        auth.bp, books.bp, users.bp, borrow.bp, analytics.bp, stream.bp, concepts.bp,
+    ):
         flask_app.register_blueprint(blueprint)
 
     @flask_app.get("/health")

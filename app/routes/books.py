@@ -14,6 +14,7 @@ from pymongo import ASCENDING, DESCENDING, ReturnDocument
 
 from app.core.auth import require_role
 from app.core.errors import ApiError
+from app.core.mongoshell import agg_call, call, find_call, record
 from app.core.schema import GENRES
 from app.core.serializers import doc_out, to_object_id
 from app.core.validation import (
@@ -237,6 +238,10 @@ def explain_query():
     milliseconds - the raw evidence for the indexing section of the report.
     """
     query = _build_filter()
+    record(
+        "Ask MongoDB how it would run this filter (query plan)",
+        find_call(BOOKS, query, explain=True),
+    )
     plan = collection(BOOKS).find(query).explain()
     execution = plan.get("executionStats", {})
     return jsonify(
@@ -259,6 +264,7 @@ def list_books():
 
     sort_key = request.args.get("sort", "added:desc").partition(":")[0]
 
+    record("Count every match, for the pager", call(BOOKS, "countDocuments", query))
     body = {
         "total": collection(BOOKS).count_documents(query),
         "skip": skip,
@@ -269,6 +275,10 @@ def list_books():
         # Derived ranking: the count does not exist on the book, so it has to
         # be computed across collections. That needs an aggregation pipeline.
         pipeline = _popularity_pipeline(query, skip, limit)
+        record(
+            "Rank by loans counted from borrow_records (an aggregation, not a plain find)",
+            agg_call(BOOKS, pipeline),
+        )
         body["items"] = [doc_out(doc) for doc in collection(BOOKS).aggregate(pipeline)]
         body["query_type"] = "aggregation pipeline"
         body["why"] = (
@@ -286,10 +296,15 @@ def list_books():
         score = {"score": {"$meta": "textScore"}}
         requested = _build_projection()
         projection = {**requested, **score} if requested else score
+        relevance = [("score", {"$meta": "textScore"})]
+        record(
+            "Find the matches, best text match first",
+            find_call(BOOKS, query, projection, relevance, skip, limit),
+        )
         cursor = (
             collection(BOOKS)
             .find(query, projection)
-            .sort([("score", {"$meta": "textScore"})])
+            .sort(relevance)
             .skip(skip)
             .limit(limit)
         )
@@ -302,10 +317,16 @@ def list_books():
     else:
         # Everything else sorts a field already stored on the book document,
         # which an index can serve directly. No pipeline is needed.
+        projection = _build_projection()
+        sort = _build_sort()
+        record(
+            "Find this page of results (a standard query, served by an index where one fits)",
+            find_call(BOOKS, query, projection, sort, skip, limit),
+        )
         cursor = (
             collection(BOOKS)
-            .find(query, _build_projection())
-            .sort(_build_sort())
+            .find(query, projection)
+            .sort(sort)
             .skip(skip)
             .limit(limit)
         )
@@ -321,7 +342,9 @@ def list_books():
 
 @bp.get("/<book_id>")
 def get_book(book_id: str):
-    doc = collection(BOOKS).find_one({"_id": to_object_id(book_id, "book id")})
+    oid = to_object_id(book_id, "book id")
+    record("Read one document by its _id", call(BOOKS, "findOne", {"_id": oid}))
+    doc = collection(BOOKS).find_one({"_id": oid})
     if doc is None:
         raise ApiError(404, "book not found")
     return jsonify(doc_out(doc))
@@ -344,9 +367,17 @@ def create_book():
         }
     )
 
+    # Recorded before the insert so a write MongoDB rejects still shows the
+    # query that was attempted. MongoDB adds the _id when it stores the document.
+    record("Insert the new book", call(BOOKS, "insertOne", doc))
+
     # A $jsonSchema violation raises OperationFailure(121), which the global
     # handler in app/core/errors.py turns into a 422.
     result = collection(BOOKS).insert_one(doc)
+    record(
+        "Read the saved document back",
+        call(BOOKS, "findOne", {"_id": result.inserted_id}),
+    )
     created = collection(BOOKS).find_one({"_id": result.inserted_id})
     return jsonify(doc_out(created)), 201
 
@@ -355,9 +386,22 @@ def create_book():
 @require_role("librarian", "admin")
 def update_book(book_id: str):
     changes = _book_payload(partial=True)
+    oid = to_object_id(book_id, "book id")
 
+    # $set changes only the supplied fields, so the stored Computed Pattern
+    # fields (borrow_count, avg_rating, review_count) are never overwritten.
+    record(
+        "Update only the fields that were sent",
+        call(
+            BOOKS,
+            "findOneAndUpdate",
+            {"_id": oid},
+            {"$set": changes},
+            {"returnDocument": "after"},
+        ),
+    )
     doc = collection(BOOKS).find_one_and_update(
-        {"_id": to_object_id(book_id, "book id")},
+        {"_id": oid},
         {"$set": changes},
         return_document=ReturnDocument.AFTER,
     )
@@ -375,9 +419,12 @@ def delete_book(book_id: str):
     # pointing at a book that no longer exists, and the Most borrowed
     # aggregation would silently drop it because its $lookup finds nothing.
     # Deleting a user is guarded the same way. Uses the book_ref index.
-    open_loans = collection(BORROW_RECORDS).count_documents(
-        {"book.book_id": oid, "status": "borrowed"}
+    loan_filter = {"book.book_id": oid, "status": "borrowed"}
+    record(
+        "Safety check: is any copy still out on loan? (uses the book_ref index)",
+        call(BORROW_RECORDS, "countDocuments", loan_filter),
     )
+    open_loans = collection(BORROW_RECORDS).count_documents(loan_filter)
     if open_loans:
         raise ApiError(
             409,
@@ -387,6 +434,7 @@ def delete_book(book_id: str):
 
     # Returned loans keep working after a delete: each one stores a snapshot
     # of the title and authors (Extended Reference Pattern).
+    record("Delete the book", call(BOOKS, "deleteOne", {"_id": oid}))
     result = collection(BOOKS).delete_one({"_id": oid})
     if result.deleted_count == 0:
         raise ApiError(404, "book not found")
