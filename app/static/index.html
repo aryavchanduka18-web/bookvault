@@ -346,6 +346,31 @@ pre.shell{max-height:420px}
   *,*::before,*::after{animation:none !important; transition:none !important}
 }
 
+/* ---------------------------------------------------------------- sign-in pill and dialog */
+.pill{
+  appearance:none; display:inline-flex; align-items:center; gap:var(--s-2);
+  height:36px; padding:0 var(--s-4); border-radius:999px; cursor:pointer;
+  font:500 13px/1 var(--sans); white-space:nowrap;
+  border:1px solid var(--border-strong); background:var(--surface); color:var(--text);
+}
+.pill:hover{background:var(--surface-subtle)}
+.pill .ph{font-size:18px}
+.pill-primary{background:var(--accent); border-color:var(--accent); color:#fff}
+.pill-primary:hover{background:var(--accent-hover); border-color:var(--accent-hover)}
+.pill-quiet{border-color:transparent; color:var(--text-secondary); background:transparent}
+.identity .pill .badge{margin-right:2px}
+dialog{
+  border:1px solid var(--border); border-radius:var(--radius-md); padding:var(--s-5);
+  width:calc(100% - 32px); max-width:440px; color:var(--text); background:var(--surface);
+  box-shadow:var(--shadow-md);
+}
+dialog::backdrop{background:rgba(22,22,22,.5)}
+dialog h2{font-size:18px; margin:0 0 var(--s-2)}
+dialog .lede{margin:0 0 var(--s-4); color:var(--text-secondary); font-size:13px}
+.dialog-form{display:grid; gap:var(--s-3)}
+.dialog-form .hint{font-size:12px; color:var(--text-secondary); margin:0}
+.dialog-actions{display:flex; gap:var(--s-2); flex-wrap:wrap; margin-top:var(--s-2)}
+
 /* ---------------------------------------------------------------- concepts */
 .concept-card{margin-bottom:var(--s-4)}
 .concept-card .lede{margin:0 0 var(--s-4); color:var(--text-secondary); max-width:80ch}
@@ -416,7 +441,7 @@ pre.shell{max-height:420px}
       <span class="switch-track" aria-hidden="true"></span>
       <span class="label">Developer view</span>
     </button>
-    <div class="identity" id="identity"><span>Not signed in</span></div>
+    <div class="identity" id="identity"></div>
   </div>
 </header>
 
@@ -722,13 +747,10 @@ pre.shell{max-height:420px}
 
   <div class="grid grid-2">
     <div class="card">
-      <div class="card-head"><h2>Sign in</h2><span class="op">JWT · bcrypt</span></div>
-      <form class="filter-bar" id="loginForm">
-        <label class="field">Account<select id="loginUser"></select></label>
-        <label class="field">Password<input type="password" id="loginPass" value="bookvault123" autocomplete="current-password"></label>
-        <div class="actions"><button class="btn btn-primary" type="submit"><i class="ph ph-sign-in" aria-hidden="true"></i>Sign in</button></div>
-      </form>
-      <p class="chart-note">Every seeded account shares one demo password. The issued token carries the role used for authorisation.</p>
+      <div class="card-head"><h2>Your session</h2><span class="op">JWT · bcrypt</span></div>
+      <p id="sessionNote" style="margin:0 0 16px">Not signed in.</p>
+      <button class="btn btn-primary" type="button" id="sessionBtn"><i class="ph ph-sign-in" aria-hidden="true"></i>Sign in</button>
+      <p class="chart-note">Signing in returns a signed token (JWT) that carries your role. Passwords are stored only as bcrypt hashes.</p>
     </div>
 
     <div class="card">
@@ -912,6 +934,21 @@ pre.shell{max-height:420px}
 </section>
 
 </main>
+
+<dialog id="loginDialog" aria-labelledby="loginTitle">
+  <h2 id="loginTitle">Welcome to BookVault</h2>
+  <p class="lede">Sign in to borrow and return books. You can also continue as a guest to browse the catalog and the dashboard.</p>
+  <form class="dialog-form" id="loginForm">
+    <label class="field">Account<select id="loginUser"></select></label>
+    <p class="hint" id="roleHint"></p>
+    <label class="field">Password<input type="password" id="loginPass" value="bookvault123" autocomplete="current-password"></label>
+    <p class="hint">This is a demo: every account shares one password and it is already filled in.</p>
+    <div class="dialog-actions">
+      <button class="btn btn-primary" type="submit"><i class="ph ph-sign-in" aria-hidden="true"></i>Sign in</button>
+      <button class="btn btn-ghost" type="button" id="guestBtn">Continue as guest</button>
+    </div>
+  </form>
+</dialog>
 
 <div id="toasts" aria-live="polite" aria-atomic="false"></div>
 
@@ -1809,22 +1846,70 @@ $("#loginForm").addEventListener("submit", async (event) => {
     });
     TOKEN = data.access_token;
     ME = data.user;
-
-    const identity = $("#identity");
-    identity.textContent = "";
-    const badge = document.createElement("span");
-    badge.className = "badge badge-accent";
-    badge.textContent = ME.role;
-    const name = document.createElement("strong");
-    name.textContent = ME.name;
-    identity.appendChild(badge);
-    identity.appendChild(name);
-
+    $("#loginDialog").close();
+    renderIdentity();
     toast("Signed in as " + ME.name + ".");
     showManageTab();
     loadLoans();
   } catch (err){ toast(err.message, "error"); }
 });
+
+const ROLE_HINTS = {
+  student: "Student: can browse the catalog and borrow or return books.",
+  librarian: "Librarian: everything a student can do, plus adding and editing books.",
+  admin: "Administrator: everything, including deleting books and members."
+};
+
+/* The header pill and the Circulation status card both reflect the session. */
+function renderIdentity(){
+  const identity = clear($("#identity"));
+  if (ME){
+    const who = el("button", "pill");
+    who.type = "button";
+    who.title = "Signed in. Click to switch account.";
+    who.appendChild(badge(ME.role, "accent"));
+    who.appendChild(document.createTextNode(ME.name));
+    who.addEventListener("click", openLogin);
+    const out = el("button", "pill pill-quiet", "Sign out");
+    out.type = "button";
+    out.addEventListener("click", signOut);
+    identity.appendChild(who);
+    identity.appendChild(out);
+    $("#sessionNote").textContent = "Signed in as " + ME.name + " (" + ME.role + ").";
+    $("#sessionBtn").textContent = "Switch account";
+  } else {
+    const inBtn = el("button", "pill pill-primary");
+    inBtn.type = "button";
+    const icon = el("i", "ph ph-user-circle");
+    icon.setAttribute("aria-hidden", "true");
+    inBtn.appendChild(icon);
+    inBtn.appendChild(document.createTextNode("Sign in"));
+    inBtn.addEventListener("click", openLogin);
+    identity.appendChild(inBtn);
+    $("#sessionNote").textContent = "Not signed in. You can browse, but borrowing and managing need an account.";
+    $("#sessionBtn").textContent = "Sign in";
+  }
+}
+
+function openLogin(){
+  updateRoleHint();
+  if (!$("#loginDialog").open) $("#loginDialog").showModal();
+}
+function updateRoleHint(){
+  const option = $("#loginUser").selectedOptions[0];
+  $("#roleHint").textContent = option ? (ROLE_HINTS[option.dataset.role] || "") : "";
+}
+function signOut(){
+  TOKEN = null; ME = null;
+  renderIdentity();
+  showManageTab();
+  toast("Signed out.");
+}
+
+$("#loginUser").addEventListener("change", updateRoleHint);
+$("#guestBtn").addEventListener("click", () => $("#loginDialog").close());
+$("#sessionBtn").addEventListener("click", openLogin);
+renderIdentity();
 
 let issueRequest = 0;
 
@@ -2032,7 +2117,7 @@ function showManageTab(){
     lead.textContent = "Locked. ";
     message.appendChild(lead);
     message.appendChild(document.createTextNode(
-      "Sign in as a librarian or administrator on the Circulation tab to manage titles."));
+      "Use the Sign in button (top right) and choose a librarian or administrator account to manage titles."));
   }
   banner.appendChild(icon);
   banner.appendChild(message);
@@ -2341,9 +2426,11 @@ function connectStream(){
     (meta.accounts || []).forEach((account) => {
       const option = document.createElement("option");
       option.value = account.email;
-      option.textContent = account.role + "   " + account.name;
+      option.textContent = account.name + " (" + account.role + ")";
+      option.dataset.role = account.role;
       accounts.appendChild(option);
     });
+    updateRoleHint();
 
     const genres = $("#fGenre");
     const formGenres = $("#mfGenre");
@@ -2359,6 +2446,9 @@ function connectStream(){
       formGenres.appendChild(formOption);
     });
   } catch (err){ /* non-fatal */ }
+
+  /* Ask who is visiting first. Guests can dismiss it and still browse. */
+  openLogin();
 
   await loadOverview();
   await loadPipelineList();
