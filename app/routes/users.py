@@ -7,7 +7,7 @@ full history renders with ONE query and no $lookup at all.
 
 from datetime import datetime, timezone
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, g, jsonify, request
 from pymongo import DESCENDING, ReturnDocument
 
 from app.core.auth import require_auth, require_role
@@ -124,6 +124,11 @@ def user_history(user_id: str):
     which does need $lookup because it reads present-day stock levels.
     """
     oid = to_object_id(user_id, "user id")
+
+    # A member may read only their own history; staff may read anyone's.
+    if g.user.get("role") not in ("librarian", "admin") and str(oid) != g.user.get("sub"):
+        raise ApiError(403, "not your account", "you can only view your own loan history")
+
     record("Check the member exists", call(USERS, "countDocuments", {"_id": oid}, {"limit": 1}))
     if collection(USERS).count_documents({"_id": oid}, limit=1) == 0:
         raise ApiError(404, "user not found")

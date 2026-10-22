@@ -14,7 +14,7 @@ standalone mongod.
 
 from datetime import datetime, timedelta, timezone
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, g, jsonify, request
 from pymongo import DESCENDING, ReturnDocument
 
 from app.config import get_settings
@@ -44,6 +44,27 @@ DEFAULT_LOAN_DAYS = 14
 
 class _DeliberateFailure(Exception):
     """Raised only by /borrow/demo-failure, to force a rollback."""
+
+
+# Librarians and administrators run the circulation desk, so they may act for
+# any member. Everyone else may only act on their own account.
+STAFF_ROLES = ("librarian", "admin")
+
+
+def _is_staff() -> bool:
+    return g.user.get("role") in STAFF_ROLES
+
+
+def _require_self_or_staff(member_id, action: str) -> None:
+    """The token, not the request body, decides whose records a user may touch."""
+    if _is_staff():
+        return
+    if str(member_id) != g.user.get("sub"):
+        raise ApiError(
+            403,
+            "not your account",
+            f"{action} is limited to your own account; librarians and administrators may act for any member",
+        )
 
 
 def _log_transaction_start() -> None:
@@ -98,6 +119,7 @@ def _load_borrow_request() -> tuple:
 
     user_id = to_object_id(field_str(data, "user_id"), "user id")
     book_id = to_object_id(field_str(data, "book_id"), "book id")
+    _require_self_or_staff(user_id, "borrowing")
 
     days = field_int(data, "days", required=False, minimum=1, maximum=90)
     if days is MISSING:
@@ -288,6 +310,17 @@ def return_book():
     if rating is MISSING:
         rating = None
 
+    # Ownership is checked before the transaction opens. A loan's user_id never
+    # changes, so there is no race here. A loan that does not exist falls
+    # through to the 404 inside the transaction below.
+    log_op(
+        "Check who owns the loan before closing it",
+        call(BORROW_RECORDS, "findOne", {"_id": borrow_id}, {"user_id": 1}),
+    )
+    owner = collection(BORROW_RECORDS).find_one({"_id": borrow_id}, {"user_id": 1})
+    if owner is not None:
+        _require_self_or_staff(owner["user_id"], "returning a book")
+
     client = get_client()
     db = get_db()
 
@@ -406,6 +439,13 @@ def list_borrows():
     user_id = request.args.get("user_id")
     if user_id:
         query["user_id"] = to_object_id(user_id, "user id")
+
+    # Members see only their own loans; staff may filter by any member.
+    if not _is_staff():
+        own = to_object_id(g.user["sub"], "user id")
+        if "user_id" in query and query["user_id"] != own:
+            raise ApiError(403, "not your account", "you can only list your own loans")
+        query["user_id"] = own
 
     book_id = request.args.get("book_id")
     if book_id:

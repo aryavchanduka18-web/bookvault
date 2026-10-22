@@ -2376,13 +2376,23 @@ function setConnection(state, label){
   $("#connText").textContent = label;
 }
 
+let streamRetry = null, streamDelay = 1000;
+
 function connectStream(){
-  if (stream) return;
-  stream = new EventSource("/stream/events");
+  /* Already open or connecting: nothing to do. A CLOSED stream is replaced. */
+  if (stream && stream.readyState !== EventSource.CLOSED) return;
+  clearTimeout(streamRetry);
 
-  stream.addEventListener("ready", () => setConnection("live", "Connected"));
+  setConnection("retry", "Connecting");
+  const source = new EventSource("/stream/events");
+  stream = source;
 
-  stream.addEventListener("change", (event) => {
+  source.addEventListener("ready", () => {
+    streamDelay = 1000;
+    setConnection("live", "Connected");
+  });
+
+  source.addEventListener("change", (event) => {
     const data = JSON.parse(event.data);
     const feed = $("#feed");
     if (feed.querySelector(".empty")) feed.textContent = "";
@@ -2413,7 +2423,20 @@ function connectStream(){
     while (feed.children.length > 50) feed.removeChild(feed.lastChild);
   });
 
-  stream.onerror = () => setConnection("retry", "Reconnecting");
+  source.onerror = () => {
+    setConnection("retry", "Reconnecting");
+
+    /* After a dropped connection the browser retries by itself. But if the
+       server answered with an error status (Render answers 503 while it wakes
+       up or redeploys) the browser gives up for good and the stream is CLOSED.
+       Make a new one ourselves, backing off so a sleeping server is not hammered. */
+    if (source.readyState === EventSource.CLOSED){
+      source.close();
+      if (stream === source) stream = null;
+      streamRetry = setTimeout(connectStream, streamDelay);
+      streamDelay = Math.min(streamDelay * 2, 15000);
+    }
+  };
 }
 
 /* ============================================================ boot */
